@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { config } from './config.js';
+import yahooFinance from 'yahoo-finance2';
 
 interface Quote {
   symbol: string;
@@ -23,6 +22,10 @@ interface ChartData {
 const quoteCache = new Map<string, { quote: Quote; timestamp: number }>();
 const CACHE_TTL = 15000;
 
+// Cache for search results (expires after 5 minutes)
+const searchCache = new Map<string, { results: any[]; timestamp: number }>();
+const SEARCH_CACHE_TTL = 300000;
+
 export async function getQuote(symbol: string): Promise<Quote | null> {
   const cached = quoteCache.get(symbol);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
@@ -30,72 +33,31 @@ export async function getQuote(symbol: string): Promise<Quote | null> {
   }
 
   try {
-    // Check if it's a crypto symbol
-    if (symbol.includes('-') || ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP'].includes(symbol.toUpperCase())) {
-      return await getCryptoQuote(symbol);
+    // Convert crypto symbols to Yahoo format
+    let yahooSymbol = symbol.toUpperCase();
+    if (['BTC', 'ETH', 'SOL', 'DOGE', 'XRP'].includes(yahooSymbol)) {
+      yahooSymbol = `${yahooSymbol}-USD`;
     }
 
-    const response = await axios.get(config.alphaVantage.baseUrl, {
-      params: {
-        function: 'GLOBAL_QUOTE',
-        symbol: symbol.toUpperCase(),
-        apikey: config.alphaVantage.apiKey,
-      },
-    });
-
-    const data = response.data['Global Quote'];
-    if (!data || !data['05. price']) {
+    const result = await yahooFinance.quote(yahooSymbol) as any;
+    
+    if (!result || !result.regularMarketPrice) {
       return null;
     }
 
     const quote: Quote = {
-      symbol: data['01. symbol'],
-      price: parseFloat(data['05. price']),
-      change: parseFloat(data['09. change']),
-      changePercent: parseFloat(data['10. change percent']?.replace('%', '') || '0'),
-      volume: parseInt(data['06. volume']),
-      timestamp: data['07. latest trading day'],
+      symbol: result.symbol || yahooSymbol,
+      price: result.regularMarketPrice,
+      change: result.regularMarketChange || 0,
+      changePercent: result.regularMarketChangePercent || 0,
+      volume: result.regularMarketVolume || 0,
+      timestamp: new Date().toISOString(),
     };
 
     quoteCache.set(symbol, { quote, timestamp: Date.now() });
     return quote;
   } catch (error) {
     console.error(`Error fetching quote for ${symbol}:`, error);
-    return null;
-  }
-}
-
-async function getCryptoQuote(symbol: string): Promise<Quote | null> {
-  try {
-    const cryptoSymbol = symbol.replace('-USD', '').replace('USD', '');
-    
-    const response = await axios.get(config.alphaVantage.baseUrl, {
-      params: {
-        function: 'CURRENCY_EXCHANGE_RATE',
-        from_currency: cryptoSymbol,
-        to_currency: 'USD',
-        apikey: config.alphaVantage.apiKey,
-      },
-    });
-
-    const data = response.data['Realtime Currency Exchange Rate'];
-    if (!data) {
-      return null;
-    }
-
-    const quote: Quote = {
-      symbol: `${cryptoSymbol}-USD`,
-      price: parseFloat(data['5. Exchange Rate']),
-      change: 0,
-      changePercent: 0,
-      volume: 0,
-      timestamp: data['6. Last Refreshed'],
-    };
-
-    quoteCache.set(symbol, { quote, timestamp: Date.now() });
-    return quote;
-  } catch (error) {
-    console.error(`Error fetching crypto quote for ${symbol}:`, error);
     return null;
   }
 }
@@ -107,23 +69,27 @@ export async function searchSymbols(query: string): Promise<Array<{
   exchange: string;
   currency: string;
 }>> {
-  try {
-    const response = await axios.get(config.alphaVantage.baseUrl, {
-      params: {
-        function: 'SYMBOL_SEARCH',
-        keywords: query,
-        apikey: config.alphaVantage.apiKey,
-      },
-    });
+  const cacheKey = query.toLowerCase();
+  const cached = searchCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < SEARCH_CACHE_TTL) {
+    return cached.results;
+  }
 
-    const matches = response.data.bestMatches || [];
-    return matches.map((match: any) => ({
-      symbol: match['1. symbol'],
-      name: match['2. name'],
-      type: match['3. type'],
-      exchange: match['4. region'],
-      currency: match['8. currency'],
-    }));
+  try {
+    const result = await yahooFinance.search(query, { quotesCount: 10 }) as any;
+    
+    const results = (result.quotes || [])
+      .filter((q: any) => q.symbol && (q.shortname || q.longname))
+      .map((q: any) => ({
+        symbol: q.symbol,
+        name: q.shortname || q.longname || q.symbol,
+        type: q.quoteType || 'Equity',
+        exchange: q.exchange || 'Unknown',
+        currency: q.currency || 'USD',
+      }));
+
+    searchCache.set(cacheKey, { results, timestamp: Date.now() });
+    return results;
   } catch (error) {
     console.error(`Error searching symbols for ${query}:`, error);
     return [];
@@ -135,44 +101,30 @@ export async function getChartData(
   interval: 'daily' | 'weekly' | 'monthly' = 'daily'
 ): Promise<ChartData[]> {
   try {
-    const functionName = {
-      daily: 'TIME_SERIES_DAILY',
-      weekly: 'TIME_SERIES_WEEKLY',
-      monthly: 'TIME_SERIES_MONTHLY',
-    }[interval];
+    const intervalMap: Record<string, '1d' | '1wk' | '1mo'> = {
+      daily: '1d',
+      weekly: '1wk',
+      monthly: '1mo',
+    };
 
-    const response = await axios.get(config.alphaVantage.baseUrl, {
-      params: {
-        function: functionName,
-        symbol: symbol.toUpperCase(),
-        apikey: config.alphaVantage.apiKey,
-      },
-    });
+    const result = await yahooFinance.chart(symbol.toUpperCase(), {
+      period1: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000), // 1 year ago
+      period2: new Date(),
+      interval: intervalMap[interval],
+    }) as any;
 
-    const timeSeriesKey = Object.keys(response.data).find((key) =>
-      key.includes('Time Series')
-    );
-    
-    if (!timeSeriesKey) {
+    if (!result.quotes || result.quotes.length === 0) {
       return [];
     }
 
-    const timeSeries = response.data[timeSeriesKey];
-    const chartData: ChartData[] = [];
-
-    for (const [timestamp, values] of Object.entries(timeSeries)) {
-      const v = values as any;
-      chartData.push({
-        timestamp,
-        open: parseFloat(v['1. open']),
-        high: parseFloat(v['2. high']),
-        low: parseFloat(v['3. low']),
-        close: parseFloat(v['4. close']),
-        volume: parseInt(v['5. volume']),
-      });
-    }
-
-    return chartData.reverse();
+    return result.quotes.map((q: any) => ({
+      timestamp: new Date(q.date).toISOString().split('T')[0],
+      open: q.open || 0,
+      high: q.high || 0,
+      low: q.low || 0,
+      close: q.close || 0,
+      volume: q.volume || 0,
+    }));
   } catch (error) {
     console.error(`Error fetching chart data for ${symbol}:`, error);
     return [];
@@ -216,7 +168,7 @@ async function startPricePolling(symbol: string): Promise<void> {
       subscribers.forEach((callback) => callback(quote));
     }
 
-    setTimeout(poll, 15000); // Poll every 15 seconds (Alpha Vantage rate limit)
+    setTimeout(poll, 10000); // Poll every 10 seconds
   };
 
   poll();
