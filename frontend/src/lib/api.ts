@@ -36,12 +36,20 @@ async function apiRequest<T>(endpoint: string, options: ApiOptions = {}): Promis
 // User API
 export const userApi = {
   getMe: () => apiRequest<any>('/api/users/me'),
+  createOrUpdateMe: (email: string, displayName: string) => apiRequest<any>('/api/users/me', {
+    method: 'POST',
+    body: { email, displayName },
+  }),
   getMyStrategies: () => apiRequest<any[]>('/api/users/me/strategies'),
   getAllUsers: () => apiRequest<any[]>('/api/users'),
   getUserStrategies: (userId: number) => apiRequest<any[]>(`/api/users/${userId}/strategies`),
   updateProfile: (displayName: string) => apiRequest<any>('/api/users/me', {
     method: 'PATCH',
     body: { displayName },
+  }),
+  renameStrategy: (strategyId: number, name: string) => apiRequest<any>(`/api/strategies/${strategyId}`, {
+    method: 'PATCH',
+    body: { name },
   }),
 };
 

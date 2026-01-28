@@ -56,11 +56,14 @@ export async function leaderboardRoutes(fastify: FastifyInstance): Promise<void>
       let totalMarketValue = 0;
       for (const pos of positions) {
         const quote = await getQuote(pos.symbol);
-        const price = quote?.price || pos.average_cost;
-        totalMarketValue += pos.quantity * price;
+        const quantity = parseFloat(pos.quantity.toString());
+        const averageCost = parseFloat(pos.average_cost.toString());
+        const price = quote?.price || averageCost;
+        totalMarketValue += quantity * price;
       }
 
-      const netWorth = strategy.cash_balance + totalMarketValue;
+      const cashBalance = parseFloat(strategy.cash_balance.toString());
+      const netWorth = cashBalance + totalMarketValue;
       const startingBalance = 100000; // From config
       const pnl = netWorth - startingBalance;
       const pnlPercent = (pnl / startingBalance) * 100;

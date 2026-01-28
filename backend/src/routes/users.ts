@@ -27,15 +27,48 @@ export async function userRoutes(fastify: FastifyInstance): Promise<void> {
     );
     
     if (!user) {
-      // Create new user
+      // Create new user with placeholder - frontend should call POST to update
       const email = request.user!.email || '';
-      const displayName = request.user!.name || email.split('@')[0];
+      const displayName = request.user!.name || email.split('@')[0] || 'New User';
       
       user = await queryOne<User>(
         `INSERT INTO users (auth0_id, email, display_name) 
          VALUES ($1, $2, $3) 
          RETURNING *`,
         [auth0Id, email, displayName]
+      );
+    }
+    
+    return user;
+  });
+
+  // Create or update user with profile data from Auth0
+  fastify.post('/api/users/me', { preHandler: authenticate }, async (request, reply) => {
+    const auth0Id = request.user!.sub;
+    const { email, displayName } = request.body as { email?: string; displayName?: string };
+    
+    let user = await queryOne<User>(
+      'SELECT * FROM users WHERE auth0_id = $1',
+      [auth0Id]
+    );
+    
+    if (user) {
+      // Update existing user if display_name is empty
+      if (!user.display_name && displayName) {
+        user = await queryOne<User>(
+          `UPDATE users SET display_name = $1, email = COALESCE(NULLIF($2, ''), email), updated_at = NOW()
+           WHERE auth0_id = $3
+           RETURNING *`,
+          [displayName, email || '', auth0Id]
+        );
+      }
+    } else {
+      // Create new user
+      user = await queryOne<User>(
+        `INSERT INTO users (auth0_id, email, display_name) 
+         VALUES ($1, $2, $3) 
+         RETURNING *`,
+        [auth0Id, email || '', displayName || 'New User']
       );
     }
     
@@ -78,6 +111,42 @@ export async function userRoutes(fastify: FastifyInstance): Promise<void> {
       );
       
       return strategies;
+    }
+  );
+
+  // Rename a strategy
+  fastify.patch<{ Params: { strategyId: string } }>(
+    '/api/strategies/:strategyId',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const auth0Id = request.user!.sub;
+      const strategyId = parseInt(request.params.strategyId);
+      const { name } = request.body as { name: string };
+
+      if (!name || name.trim().length === 0) {
+        return reply.code(400).send({ error: 'Strategy name is required' });
+      }
+
+      // Verify ownership
+      const strategy = await queryOne<Strategy>(
+        `SELECT s.* FROM strategies s
+         JOIN users u ON s.user_id = u.id
+         WHERE s.id = $1 AND u.auth0_id = $2`,
+        [strategyId, auth0Id]
+      );
+
+      if (!strategy) {
+        return reply.code(403).send({ error: 'Strategy not found or access denied' });
+      }
+
+      const updated = await queryOne<Strategy>(
+        `UPDATE strategies SET name = $1, updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [name.trim(), strategyId]
+      );
+
+      return updated;
     }
   );
 

@@ -217,14 +217,18 @@ export async function tradingRoutes(fastify: FastifyInstance): Promise<void> {
       const enrichedPositions = await Promise.all(
         positions.map(async (pos) => {
           const quote = await getQuote(pos.symbol);
-          const currentPrice = quote?.price || pos.average_cost;
-          const marketValue = pos.quantity * currentPrice;
-          const costBasis = pos.quantity * pos.average_cost;
+          const quantity = parseFloat(pos.quantity.toString());
+          const averageCost = parseFloat(pos.average_cost.toString());
+          const currentPrice = quote?.price || averageCost;
+          const marketValue = quantity * currentPrice;
+          const costBasis = quantity * averageCost;
           const unrealizedPnl = marketValue - costBasis;
           const unrealizedPnlPercent = costBasis > 0 ? (unrealizedPnl / costBasis) * 100 : 0;
 
           return {
             ...pos,
+            quantity,
+            average_cost: averageCost,
             currentPrice,
             marketValue,
             costBasis,
@@ -266,9 +270,9 @@ export async function tradingRoutes(fastify: FastifyInstance): Promise<void> {
 
       for (const pos of positions) {
         const quote = await getQuote(pos.symbol);
-        const currentPrice = quote?.price || pos.average_cost;
-        const marketValue = pos.quantity * currentPrice;
-        const costBasis = pos.quantity * pos.average_cost;
+        const currentPrice = quote?.price || parseFloat(pos.average_cost.toString());
+        const marketValue = parseFloat(pos.quantity.toString()) * currentPrice;
+        const costBasis = parseFloat(pos.quantity.toString()) * parseFloat(pos.average_cost.toString());
 
         totalMarketValue += marketValue;
         totalCostBasis += costBasis;
@@ -277,14 +281,15 @@ export async function tradingRoutes(fastify: FastifyInstance): Promise<void> {
         allocationByCurrency[pos.currency] = (allocationByCurrency[pos.currency] || 0) + marketValue;
       }
 
-      const netWorth = strategy.cash_balance + totalMarketValue;
+      const cashBalance = parseFloat(strategy.cash_balance.toString());
+      const netWorth = cashBalance + totalMarketValue;
       const totalPnl = netWorth - config.trading.startingBalance;
       const totalPnlPercent = (totalPnl / config.trading.startingBalance) * 100;
 
       return {
         strategyId,
         strategyName: strategy.name,
-        cashBalance: strategy.cash_balance,
+        cashBalance,
         totalMarketValue,
         netWorth,
         totalPnl,

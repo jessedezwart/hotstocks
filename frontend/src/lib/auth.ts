@@ -49,6 +49,19 @@ export async function initAuth0(): Promise<void> {
       
       const token = await client.getTokenSilently();
       accessToken.set(token);
+
+      // Sync user profile with backend
+      if (userData) {
+        try {
+          const { userApi } = await import('./api');
+          await userApi.createOrUpdateMe(
+            userData.email || '',
+            userData.name || userData.nickname || userData.email?.split('@')[0] || 'User'
+          );
+        } catch (e) {
+          console.error('Failed to sync user profile:', e);
+        }
+      }
     }
 
     error.set(null);

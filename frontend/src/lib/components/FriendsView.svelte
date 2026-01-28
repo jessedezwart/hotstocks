@@ -92,9 +92,9 @@
     {/if}
     <h2>
       {#if selectedStrategy}
-        {selectedUser.display_name}'s Strategy {selectedStrategy.name}
+        {selectedUser?.display_name || 'User'}'s Strategy {selectedStrategy.name}
       {:else if selectedUser}
-        {selectedUser.display_name}'s Strategies
+        {selectedUser?.display_name || 'User'}'s Strategies
       {:else}
         Friends
       {/if}
@@ -110,10 +110,10 @@
     <div class="user-list">
       {#each users as user}
         <button class="user-card" onclick={() => selectUser(user)}>
-          <div class="avatar">{user.display_name.charAt(0).toUpperCase()}</div>
+          <div class="avatar">{user.display_name ? user.display_name.charAt(0).toUpperCase() : '?'}</div>
           <div class="info">
-            <span class="name">{user.display_name}</span>
-            <span class="email">{user.email}</span>
+            <span class="name">{user.display_name || user.email || 'Unknown'}</span>
+            <span class="email">{user.email || ''}</span>
           </div>
         </button>
       {/each}
