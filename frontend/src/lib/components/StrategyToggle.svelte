@@ -9,6 +9,7 @@
   let newStrategyName = '';
   let addingStrategy = false;
   let addError = '';
+  let deletingId: number | null = null;
   
   function selectStrategy(id: number) {
     activeStrategyId.set(id);
@@ -82,6 +83,37 @@
     if (e.key === 'Enter') addStrategy();
     else if (e.key === 'Escape') cancelAdd();
   }
+
+  async function deleteStrategy(strategyId: number, event: MouseEvent) {
+    event.stopPropagation();
+    
+    if ($strategies.length <= 1) {
+      addError = "Cannot delete your only strategy";
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this strategy? All positions and history will be lost.')) {
+      return;
+    }
+
+    deletingId = strategyId;
+    try {
+      await userApi.deleteStrategy(strategyId);
+      strategies.update(strats => strats.filter(s => s.id !== strategyId));
+      
+      // If we deleted the active strategy, switch to another one
+      if ($activeStrategyId === strategyId) {
+        const remaining = $strategies.filter(s => s.id !== strategyId);
+        if (remaining.length > 0) {
+          activeStrategyId.set(remaining[0].id);
+        }
+      }
+    } catch (e: any) {
+      addError = e.message || 'Failed to delete strategy';
+    } finally {
+      deletingId = null;
+    }
+  }
 </script>
 
 <div class="strategy-toggle">
@@ -100,15 +132,25 @@
           <button class="cancel-btn" onclick={cancelEdit} disabled={saving}>✕</button>
         </div>
       {:else}
-        <button
-          class="strategy-btn"
-          class:active={$activeStrategyId === strategy.id}
-          onclick={() => selectStrategy(strategy.id)}
-          ondblclick={(e) => startEdit(strategy, e)}
-          title="Double-click to rename"
-        >
-          {strategy.name}
-        </button>
+        <div class="strategy-wrapper">
+          <button
+            class="strategy-btn"
+            class:active={$activeStrategyId === strategy.id}
+            onclick={() => selectStrategy(strategy.id)}
+            ondblclick={(e) => startEdit(strategy, e)}
+            title="Double-click to rename"
+          >
+            {strategy.name}
+          </button>
+          {#if $strategies.length > 1}
+            <button 
+              class="delete-btn" 
+              onclick={(e) => deleteStrategy(strategy.id, e)}
+              disabled={deletingId === strategy.id}
+              title="Delete strategy"
+            >×</button>
+          {/if}
+        </div>
       {/if}
     {/each}
     
@@ -150,6 +192,12 @@
     gap: 0.25rem;
   }
   
+  .strategy-wrapper {
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+
   .strategy-btn {
     padding: 0.375rem 0.75rem;
     border: 1px solid #ddd;
@@ -168,6 +216,40 @@
     background: #007bff;
     color: white;
     border-color: #007bff;
+  }
+
+  .delete-btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    background: #dc3545;
+    color: white;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .strategy-wrapper:hover .delete-btn {
+    opacity: 1;
+  }
+
+  .delete-btn:hover {
+    background: #c82333;
+  }
+
+  .delete-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   
   .edit-container {

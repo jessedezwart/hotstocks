@@ -249,4 +249,53 @@ export async function userRoutes(fastify: FastifyInstance): Promise<void> {
     
     return user;
   });
+
+  // Delete a strategy
+  fastify.delete<{ Params: { strategyId: string } }>(
+    '/api/strategies/:strategyId',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const auth0Id = request.user!.sub;
+      const strategyId = Number.parseInt(request.params.strategyId, 10);
+
+      if (!Number.isFinite(strategyId)) {
+        return reply.code(400).send({ error: 'Invalid strategy ID' });
+      }
+
+      // Verify ownership
+      const strategy = await queryOne<Strategy>(
+        `SELECT s.* FROM strategies s
+         JOIN users u ON s.user_id = u.id
+         WHERE s.id = $1 AND u.auth0_id = $2`,
+        [strategyId, auth0Id]
+      );
+
+      if (!strategy) {
+        return reply.code(403).send({ error: 'Strategy not found or access denied' });
+      }
+
+      // Check if this is the user's only strategy
+      const count = await queryOne<{ count: string }>(
+        'SELECT COUNT(*) as count FROM strategies WHERE user_id = $1',
+        [strategy.user_id]
+      );
+
+      if (count && parseInt(count.count) <= 1) {
+        return reply.code(400).send({ error: 'Cannot delete your only strategy' });
+      }
+
+      try {
+        // Delete related data first
+        await execute('DELETE FROM net_worth_history WHERE strategy_id = $1', [strategyId]);
+        await execute('DELETE FROM ledger WHERE strategy_id = $1', [strategyId]);
+        await execute('DELETE FROM positions WHERE strategy_id = $1', [strategyId]);
+        await execute('DELETE FROM strategies WHERE id = $1', [strategyId]);
+
+        return { success: true };
+      } catch (err) {
+        request.log.error({ err }, 'Failed to delete strategy');
+        return reply.code(500).send({ error: 'Internal Server Error' });
+      }
+    }
+  );
 }

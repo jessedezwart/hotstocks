@@ -170,6 +170,9 @@ export const userApi = {
     method: 'PATCH',
     body: { name },
   }),
+  deleteStrategy: (strategyId: number) => apiRequest<{ success: boolean }>(`/api/strategies/${strategyId}`, {
+    method: 'DELETE',
+  }),
 };
 
 // Trading API
