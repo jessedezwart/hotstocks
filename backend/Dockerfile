@@ -28,6 +28,8 @@ RUN npm ci --production
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
+# Include SQL files for migrations
+COPY --from=builder /app/sql ./sql
 
 # Expose port
 EXPOSE 3000

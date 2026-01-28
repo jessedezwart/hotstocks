@@ -51,6 +51,9 @@ createdb hotstocks
 # Run schema migration
 cd backend
 psql -d hotstocks -f sql/schema.sql
+
+# Run migrations for updates
+npm run db:migrate
 ```
 
 ### 3. Configure Auth0

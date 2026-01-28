@@ -11,11 +11,11 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Strategies (up to 3 per user: A, B, C)
+-- Strategies (default A, B, C per user)
 CREATE TABLE strategies (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    name VARCHAR(1) NOT NULL CHECK (name IN ('A', 'B', 'C')),
+    name VARCHAR(100) NOT NULL,
     cash_balance DECIMAL(15, 2) NOT NULL DEFAULT 100000.00,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

@@ -65,6 +65,9 @@ rsync -avz --exclude node_modules --exclude dist backend/ root@95.179.155.133:/r
 
 # Restart services
 ssh root@95.179.155.133 "cd /root && docker compose up -d --build"
+
+# Run database migrations
+ssh root@95.179.155.133 "cd /root && docker compose exec -T backend node dist/migrations/migrate.js"
 ```
 
 ## Checking Deployment Status

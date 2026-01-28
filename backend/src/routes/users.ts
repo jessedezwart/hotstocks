@@ -120,11 +120,21 @@ export async function userRoutes(fastify: FastifyInstance): Promise<void> {
     { preHandler: authenticate },
     async (request, reply) => {
       const auth0Id = request.user!.sub;
-      const strategyId = parseInt(request.params.strategyId);
-      const { name } = request.body as { name: string };
+      const strategyId = Number.parseInt(request.params.strategyId, 10);
+      const { name } = request.body as { name?: string };
 
-      if (!name || name.trim().length === 0) {
+      if (!Number.isFinite(strategyId)) {
+        return reply.code(400).send({ error: 'Invalid strategy ID' });
+      }
+
+      const trimmedName = name?.trim() ?? '';
+
+      if (trimmedName.length === 0) {
         return reply.code(400).send({ error: 'Strategy name is required' });
+      }
+
+      if (trimmedName.length > 100) {
+        return reply.code(400).send({ error: 'Strategy name must be 100 characters or less' });
       }
 
       // Verify ownership
@@ -139,14 +149,39 @@ export async function userRoutes(fastify: FastifyInstance): Promise<void> {
         return reply.code(403).send({ error: 'Strategy not found or access denied' });
       }
 
-      const updated = await queryOne<Strategy>(
-        `UPDATE strategies SET name = $1, updated_at = NOW()
-         WHERE id = $2
-         RETURNING *`,
-        [name.trim(), strategyId]
+      const existing = await queryOne<{ id: number }>(
+        `SELECT id FROM strategies
+         WHERE user_id = $1 AND name = $2 AND id <> $3`,
+        [strategy.user_id, trimmedName, strategyId]
       );
 
-      return updated;
+      if (existing) {
+        return reply.code(409).send({ error: 'Strategy name already in use' });
+      }
+
+      try {
+        const updated = await queryOne<Strategy>(
+          `UPDATE strategies SET name = $1, updated_at = NOW()
+           WHERE id = $2
+           RETURNING *`,
+          [trimmedName, strategyId]
+        );
+
+        return updated;
+      } catch (err) {
+        const code = typeof err === 'object' && err !== null && 'code' in err ? (err as { code?: string }).code : undefined;
+
+        if (code === '23505') {
+          return reply.code(409).send({ error: 'Strategy name already in use' });
+        }
+
+        if (code === '22001' || code === '23514') {
+          return reply.code(400).send({ error: 'Strategy name is invalid' });
+        }
+
+        request.log.error({ err }, 'Failed to rename strategy');
+        return reply.code(500).send({ error: 'Internal Server Error' });
+      }
     }
   );
 

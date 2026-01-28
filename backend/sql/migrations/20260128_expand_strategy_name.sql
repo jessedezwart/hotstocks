@@ -1,0 +1,2 @@
+ALTER TABLE strategies DROP CONSTRAINT IF EXISTS strategies_name_check;
+ALTER TABLE strategies ALTER COLUMN name TYPE VARCHAR(100);
