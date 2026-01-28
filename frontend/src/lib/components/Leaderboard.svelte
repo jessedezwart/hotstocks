@@ -79,7 +79,7 @@
               {/if}
             </td>
             <td class="player">{entry.displayName}</td>
-            <td class="strategy">Strategy {entry.strategyName}</td>
+            <td class="strategy">{entry.strategyName}</td>
             <td class="net-worth">{formatCurrency(entry.netWorth)}</td>
             <td class="pnl" class:positive={entry.pnl >= 0} class:negative={entry.pnl < 0}>
               {formatCurrency(entry.pnl)}
