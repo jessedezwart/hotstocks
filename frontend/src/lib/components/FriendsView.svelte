@@ -205,8 +205,7 @@
         <button class="user-card" onclick={() => selectUser(user)}>
           <div class="avatar">{user.display_name ? user.display_name.charAt(0).toUpperCase() : '?'}</div>
           <div class="info">
-            <span class="name">{user.display_name || user.email || 'Unknown'}</span>
-            <span class="email">{user.email || ''}</span>
+            <span class="name">{user.display_name || 'Unknown'}</span>
           </div>
         </button>
       {/each}

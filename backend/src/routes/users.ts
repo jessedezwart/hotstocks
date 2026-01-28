@@ -93,7 +93,7 @@ export async function userRoutes(fastify: FastifyInstance): Promise<void> {
   // Get all users (friends)
   fastify.get('/api/users', { preHandler: authenticate }, async (request, reply) => {
     const users = await query<User>(
-      'SELECT id, display_name, email FROM users ORDER BY display_name'
+      'SELECT id, display_name FROM users ORDER BY display_name'
     );
     return users;
   });
