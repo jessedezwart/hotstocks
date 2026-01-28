@@ -20,6 +20,16 @@ interface ChartData {
   volume: number;
 }
 
+interface ProfileSummary {
+  description: string | null;
+  sector: string | null;
+  industry: string | null;
+  website: string | null;
+  fullTimeEmployees: number | null;
+  longName: string | null;
+  shortName: string | null;
+}
+
 // Cache for quotes (expires after 15 seconds)
 const quoteCache = new Map<string, { quote: Quote; timestamp: number }>();
 const CACHE_TTL = 15000;
@@ -27,6 +37,10 @@ const CACHE_TTL = 15000;
 // Cache for search results (expires after 5 minutes)
 const searchCache = new Map<string, { results: any[]; timestamp: number }>();
 const SEARCH_CACHE_TTL = 300000;
+
+// Cache for profile summaries (expires after 30 minutes)
+const profileCache = new Map<string, { profile: ProfileSummary; timestamp: number }>();
+const PROFILE_CACHE_TTL = 30 * 60 * 1000;
 
 export async function getQuote(symbol: string): Promise<Quote | null> {
   const cached = quoteCache.get(symbol);
@@ -130,6 +144,40 @@ export async function getChartData(
   } catch (error) {
     console.error(`Error fetching chart data for ${symbol}:`, error);
     return [];
+  }
+}
+
+export async function getProfileSummary(symbol: string): Promise<ProfileSummary | null> {
+  const cacheKey = symbol.toUpperCase();
+  const cached = profileCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < PROFILE_CACHE_TTL) {
+    return cached.profile;
+  }
+
+  try {
+    const result = await yahooFinance.quoteSummary(cacheKey, {
+      modules: ['assetProfile', 'summaryProfile', 'price'],
+    }) as any;
+
+    const assetProfile = result?.assetProfile ?? {};
+    const summaryProfile = result?.summaryProfile ?? {};
+    const price = result?.price ?? {};
+
+    const profile: ProfileSummary = {
+      description: assetProfile.longBusinessSummary || summaryProfile.longBusinessSummary || null,
+      sector: assetProfile.sector || summaryProfile.sector || null,
+      industry: assetProfile.industry || summaryProfile.industry || null,
+      website: assetProfile.website || summaryProfile.website || null,
+      fullTimeEmployees: assetProfile.fullTimeEmployees ?? summaryProfile.fullTimeEmployees ?? null,
+      longName: price.longName || null,
+      shortName: price.shortName || null,
+    };
+
+    profileCache.set(cacheKey, { profile, timestamp: Date.now() });
+    return profile;
+  } catch (error) {
+    console.error(`Error fetching profile for ${symbol}:`, error);
+    return null;
   }
 }
 

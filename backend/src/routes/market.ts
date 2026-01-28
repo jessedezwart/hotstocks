@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { authenticate } from '../auth.js';
-import { searchSymbols, getQuote, getChartData, subscribeToPriceUpdates } from '../marketData.js';
+import { searchSymbols, getQuote, getChartData, getProfileSummary, subscribeToPriceUpdates } from '../marketData.js';
 
 export async function marketRoutes(fastify: FastifyInstance): Promise<void> {
   // Search symbols
@@ -45,6 +45,22 @@ export async function marketRoutes(fastify: FastifyInstance): Promise<void> {
       
       const data = await getChartData(symbol, interval);
       return data;
+    }
+  );
+
+  // Get profile summary
+  fastify.get<{ Params: { symbol: string } }>(
+    '/api/market/profile/:symbol',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const { symbol } = request.params;
+      const profile = await getProfileSummary(symbol);
+
+      if (!profile) {
+        return reply.code(404).send({ error: 'Profile not found' });
+      }
+
+      return profile;
     }
   );
 

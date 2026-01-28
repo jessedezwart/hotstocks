@@ -85,6 +85,16 @@ export interface ChartDataPoint {
   volume: number;
 }
 
+export interface ProfileSummary {
+  description: string | null;
+  sector: string | null;
+  industry: string | null;
+  website: string | null;
+  fullTimeEmployees: number | null;
+  longName: string | null;
+  shortName: string | null;
+}
+
 export interface LedgerEntry {
   id: number;
   strategy_id: number;
@@ -204,6 +214,7 @@ export const marketApi = {
   getQuote: (symbol: string) => apiRequest<Quote>(`/api/market/quote/${symbol}`),
   getChart: (symbol: string, interval = 'daily') => 
     apiRequest<ChartDataPoint[]>(`/api/market/chart/${symbol}?interval=${interval}`),
+  getProfile: (symbol: string) => apiRequest<ProfileSummary>(`/api/market/profile/${symbol}`),
 };
 
 // Ledger API

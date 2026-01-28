@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { marketApi, createQuoteStream } from '$lib/api';
+  import { marketApi, createQuoteStream, type ProfileSummary } from '$lib/api';
 
   export let symbol: string;
   export let showChart = true;
 
   let quote: any = null;
+  let profile: ProfileSummary | null = null;
   let chartData: any[] = [];
   let loading = true;
   let error = '';
@@ -36,6 +37,11 @@
       if (showChart) {
         chartData = await marketApi.getChart(symbol);
       }
+      try {
+        profile = await marketApi.getProfile(symbol);
+      } catch {
+        profile = null;
+      }
     } catch (e: any) {
       error = e.message;
     } finally {
@@ -55,9 +61,21 @@
   $: priceClass = quote?.change >= 0 ? 'positive' : 'negative';
 
   // Chart helper functions
-  $: chartPoints = chartData
+  $: chartBars = chartData
     .map((p) => ({
+      ...p,
       date: new Date(p.timestamp),
+    }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  $: latestBar = chartBars.length > 0 ? chartBars[chartBars.length - 1] : null;
+  $: previousBar = chartBars.length > 1 ? chartBars[chartBars.length - 2] : null;
+
+  $: displayName = profile?.longName || profile?.shortName || quote?.symbol;
+
+  $: chartPoints = chartBars
+    .map((p) => ({
+      date: p.date,
       value: Number(p.close),
     }))
     .filter((p) => !Number.isNaN(p.value))
@@ -130,7 +148,20 @@
     <div class="error">{error}</div>
   {:else if quote}
     <div class="quote-header">
-      <h2 class="symbol">{quote.symbol}</h2>
+      <div class="symbol-row">
+        <h2 class="symbol">{displayName}</h2>
+        <a
+          class="yahoo-link"
+          href={`https://finance.yahoo.com/quote/${encodeURIComponent(quote.symbol)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Yahoo Finance ↗
+        </a>
+      </div>
+      {#if profile?.description}
+        <p class="description">{profile.description}</p>
+      {/if}
       <div class="price-container">
         <span class="price">${Number(quote.price).toFixed(2)}</span>
         <span class="change {priceClass}">
@@ -190,6 +221,56 @@
         <span class="label">Volume</span>
         <span class="value">{quote.volume?.toLocaleString() || 'N/A'}</span>
       </div>
+      {#if latestBar}
+        <div class="detail">
+          <span class="label">Open</span>
+          <span class="value">${Number(latestBar.open).toFixed(2)}</span>
+        </div>
+        <div class="detail">
+          <span class="label">High</span>
+          <span class="value">${Number(latestBar.high).toFixed(2)}</span>
+        </div>
+        <div class="detail">
+          <span class="label">Low</span>
+          <span class="value">${Number(latestBar.low).toFixed(2)}</span>
+        </div>
+        <div class="detail">
+          <span class="label">Close</span>
+          <span class="value">${Number(latestBar.close).toFixed(2)}</span>
+        </div>
+      {/if}
+      {#if previousBar}
+        <div class="detail">
+          <span class="label">Prev Close</span>
+          <span class="value">${Number(previousBar.close).toFixed(2)}</span>
+        </div>
+      {/if}
+      {#if profile?.sector}
+        <div class="detail">
+          <span class="label">Sector</span>
+          <span class="value">{profile.sector}</span>
+        </div>
+      {/if}
+      {#if profile?.industry}
+        <div class="detail">
+          <span class="label">Industry</span>
+          <span class="value">{profile.industry}</span>
+        </div>
+      {/if}
+      {#if profile?.fullTimeEmployees}
+        <div class="detail">
+          <span class="label">Employees</span>
+          <span class="value">{profile.fullTimeEmployees.toLocaleString()}</span>
+        </div>
+      {/if}
+      {#if profile?.website}
+        <div class="detail">
+          <span class="label">Website</span>
+          <a class="value link" href={profile.website} target="_blank" rel="noopener noreferrer">
+            {profile.website.replace(/^https?:\/\//, '')}
+          </a>
+        </div>
+      {/if}
       <div class="detail">
         <span class="label">Last Updated</span>
         <span class="value">{quote.timestamp}</span>
@@ -220,10 +301,34 @@
     margin-bottom: 1rem;
   }
 
+  .symbol-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+  }
+
   .symbol {
     font-size: 1.5rem;
     font-weight: 600;
-    margin: 0 0 0.5rem 0;
+    margin: 0;
+  }
+
+  .yahoo-link {
+    font-size: 0.875rem;
+    color: #007bff;
+    text-decoration: none;
+    border: 1px solid #dbe7ff;
+    background: #f7faff;
+    padding: 0.25rem 0.5rem;
+    border-radius: 999px;
+    transition: all 0.15s ease;
+  }
+
+  .yahoo-link:hover {
+    border-color: #007bff;
+    background: #eef5ff;
   }
 
   .price-container {
@@ -248,6 +353,13 @@
 
   .change.negative {
     color: #dc3545;
+  }
+
+  .description {
+    margin: 0 0 0.75rem 0;
+    color: #555;
+    line-height: 1.4;
+    font-size: 0.95rem;
   }
 
   .chart-container {
@@ -310,8 +422,9 @@
   }
 
   .quote-details {
-    display: flex;
-    gap: 2rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem 1.5rem;
     margin-top: 1rem;
     padding-top: 1rem;
     border-top: 1px solid #eee;
@@ -331,6 +444,15 @@
 
   .detail .value {
     font-weight: 500;
+  }
+
+  .detail .value.link {
+    color: #007bff;
+    text-decoration: none;
+  }
+
+  .detail .value.link:hover {
+    text-decoration: underline;
   }
 
   /* Mobile Responsive */
