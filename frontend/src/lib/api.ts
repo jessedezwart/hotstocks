@@ -126,12 +126,15 @@ async function apiRequest<T>(endpoint: string, options: ApiOptions = {}): Promis
   const token = await getAccessToken();
   
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...options.headers,
   };
   
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  if (options.body && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
   }
   
   const response = await fetch(`${apiConfig.baseUrl}${endpoint}`, {
