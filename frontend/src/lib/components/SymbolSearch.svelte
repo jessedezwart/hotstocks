@@ -159,4 +159,24 @@
     font-size: 0.75rem;
     color: #666;
   }
+
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    input {
+      font-size: 16px; /* Prevents zoom on iOS */
+      padding: 0.625rem 0.875rem;
+    }
+
+    .results {
+      max-height: 250px;
+    }
+
+    .results li button {
+      padding: 0.625rem 0.875rem;
+    }
+
+    .name {
+      font-size: 0.8rem;
+    }
+  }
 </style>

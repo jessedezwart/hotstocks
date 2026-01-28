@@ -147,4 +147,26 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .strategy-toggle {
+      gap: 0.25rem;
+    }
+
+    .strategy-btn {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.8rem;
+    }
+
+    .edit-container input {
+      width: 70px;
+      font-size: 0.75rem;
+    }
+
+    .save-btn, .cancel-btn {
+      padding: 0.2rem 0.4rem;
+      font-size: 0.75rem;
+    }
+  }
 </style>

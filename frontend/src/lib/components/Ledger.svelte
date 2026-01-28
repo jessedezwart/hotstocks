@@ -277,4 +277,41 @@
     font-size: 0.875rem;
     color: #666;
   }
+
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .ledger {
+      padding: 0.5rem;
+    }
+
+    h2 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .ledger-table {
+      display: block;
+      overflow-x: auto;
+    }
+
+    .ledger-table th,
+    .ledger-table td {
+      padding: 0.5rem;
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+
+    .notes {
+      max-width: 100px;
+    }
+
+    .pagination {
+      gap: 0.5rem;
+    }
+
+    .pagination button {
+      padding: 0.375rem 0.75rem;
+      font-size: 0.875rem;
+    }
+  }
 </style>

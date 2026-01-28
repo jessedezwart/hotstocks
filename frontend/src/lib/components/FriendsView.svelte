@@ -610,4 +610,89 @@
   .x-label {
     text-anchor: middle;
   }
+
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .friends-view {
+      padding: 0.5rem;
+    }
+
+    .header {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .header h2 {
+      font-size: 1.2rem;
+    }
+
+    .back-btn {
+      padding: 0.375rem 0.75rem;
+      font-size: 0.875rem;
+    }
+
+    .user-list, .strategy-list {
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .user-card, .strategy-card {
+      padding: 0.75rem;
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      font-size: 1rem;
+    }
+
+    .name {
+      font-size: 0.9rem;
+    }
+
+    .email {
+      font-size: 0.75rem;
+    }
+
+    .portfolio-view .summary-cards {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+    }
+
+    .card {
+      padding: 0.875rem;
+    }
+
+    .card .value {
+      font-size: 1.1rem;
+    }
+
+    .positions-table {
+      display: block;
+      overflow-x: auto;
+    }
+
+    .positions-table th,
+    .positions-table td {
+      padding: 0.5rem;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .user-list, .strategy-list {
+      grid-template-columns: 1fr;
+    }
+
+    .card .value {
+      font-size: 0.95rem;
+    }
+
+    .chart-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+    }
+  }
 </style>

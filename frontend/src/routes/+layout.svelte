@@ -172,8 +172,8 @@
 
   .header {
     background: white;
-    padding: 0 1.5rem;
-    height: 64px;
+    padding: 0 1rem;
+    min-height: 64px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -181,29 +181,37 @@
     position: sticky;
     top: 0;
     z-index: 100;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   .header-left, .header-right {
     display: flex;
     align-items: center;
-    gap: 2rem;
+    gap: 1rem;
+  }
+
+  .header-left {
+    flex-wrap: wrap;
   }
 
   .logo {
     font-size: 1.25rem;
     margin: 0;
+    white-space: nowrap;
   }
 
   .nav {
     display: flex;
     gap: 0.25rem;
+    flex-wrap: wrap;
   }
 
   .nav-link {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 0.75rem;
     color: #666;
     text-decoration: none;
     border-radius: 6px;
@@ -232,7 +240,7 @@
   .user-menu {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
   }
 
   .user-name {
@@ -258,6 +266,81 @@
   .main {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 1.5rem;
+    padding: 1rem;
+  }
+
+  /* Mobile Responsive Styles */
+  @media (max-width: 768px) {
+    .header {
+      padding: 0.5rem;
+      min-height: auto;
+    }
+
+    .header-left {
+      width: 100%;
+      justify-content: space-between;
+    }
+
+    .header-right {
+      width: 100%;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+    }
+
+    .logo {
+      font-size: 1.1rem;
+    }
+
+    .nav {
+      gap: 0;
+    }
+
+    .nav-link {
+      padding: 0.4rem 0.5rem;
+    }
+
+    .nav-link .label {
+      display: none;
+    }
+
+    .nav-link .icon {
+      font-size: 1.25rem;
+    }
+
+    .user-name {
+      display: none;
+    }
+
+    .main {
+      padding: 0.75rem;
+    }
+
+    .login-card {
+      margin: 1rem;
+      padding: 2rem 1.5rem;
+    }
+
+    .login-card h1 {
+      font-size: 2rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .header-left, .header-right {
+      gap: 0.5rem;
+    }
+
+    .nav-link {
+      padding: 0.35rem 0.4rem;
+    }
+
+    .nav-link .icon {
+      font-size: 1.1rem;
+    }
+
+    .logout-btn {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+    }
   }
 </style>

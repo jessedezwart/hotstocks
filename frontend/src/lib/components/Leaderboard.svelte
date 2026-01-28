@@ -196,4 +196,44 @@
   tr.clickable.bronze:hover {
     background: linear-gradient(90deg, rgba(205, 127, 50, 0.2) 0%, rgba(0, 123, 255, 0.05) 100%);
   }
+
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .leaderboard {
+      padding: 0.5rem;
+    }
+
+    h2 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .leaderboard-table {
+      display: block;
+      overflow-x: auto;
+    }
+
+    .leaderboard-table th,
+    .leaderboard-table td {
+      padding: 0.625rem 0.5rem;
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+
+    .rank {
+      font-size: 1rem;
+    }
+
+    .net-worth {
+      font-size: 0.95rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .leaderboard-table th,
+    .leaderboard-table td {
+      padding: 0.5rem 0.375rem;
+      font-size: 0.75rem;
+    }
+  }
 </style>

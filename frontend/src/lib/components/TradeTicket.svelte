@@ -361,4 +361,28 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .trade-ticket {
+      padding: 1rem;
+    }
+
+    .mode-toggle {
+      flex-direction: column;
+    }
+
+    .mode-toggle button {
+      width: 100%;
+    }
+
+    .input-group input {
+      font-size: 1rem;
+      padding: 0.625rem;
+    }
+
+    .submit-btn {
+      padding: 0.875rem;
+    }
+  }
 </style>

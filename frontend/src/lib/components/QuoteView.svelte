@@ -172,4 +172,38 @@
   .detail .value {
     font-weight: 500;
   }
+
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .quote-view {
+      padding: 1rem;
+    }
+
+    .header {
+      flex-wrap: wrap;
+      gap: 0.25rem;
+    }
+
+    .symbol {
+      font-size: 1.5rem;
+    }
+
+    .price {
+      font-size: 1.5rem;
+    }
+
+    .chart-container {
+      height: 200px;
+    }
+
+    .quote-details {
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .detail {
+      flex: 1;
+      min-width: 80px;
+    }
+  }
 </style>

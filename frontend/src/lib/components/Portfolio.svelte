@@ -525,4 +525,64 @@
   .x-label {
     text-anchor: middle;
   }
+
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .portfolio {
+      padding: 0.5rem;
+    }
+
+    .summary-cards {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+    }
+
+    .card {
+      padding: 0.875rem;
+    }
+
+    .card .value {
+      font-size: 1.1rem;
+    }
+
+    .card .label {
+      font-size: 0.65rem;
+    }
+
+    .positions-table {
+      display: block;
+      overflow-x: auto;
+    }
+
+    .positions-table th,
+    .positions-table td {
+      padding: 0.5rem;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .section h3 {
+      font-size: 1.1rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .summary-cards {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .card .value {
+      font-size: 0.95rem;
+    }
+
+    .allocations {
+      grid-template-columns: 1fr;
+    }
+
+    .chart-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+    }
+  }
 </style>
