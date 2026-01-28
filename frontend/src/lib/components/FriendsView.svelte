@@ -1,33 +1,55 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { userApi, tradingApi } from '$lib/api';
+  import { goto } from '$app/navigation';
+  import { userApi, tradingApi, type User, type Strategy, type Portfolio, type Position, type NetWorthPoint } from '$lib/api';
 
-  let users: any[] = [];
-  let selectedUser: any = null;
-  let strategies: any[] = [];
-  let selectedStrategy: any = null;
-  let portfolio: any = null;
-  let positions: any[] = [];
-  let netWorthHistory: any[] = [];
+  // Props for direct navigation from leaderboard
+  export let userId: string | null = null;
+  export let strategyId: string | null = null;
+
+  let users: User[] = [];
+  let selectedUser: User | null = null;
+  let strategies: Strategy[] = [];
+  let selectedStrategy: Strategy | null = null;
+  let portfolio: Portfolio | null = null;
+  let positions: Position[] = [];
+  let netWorthHistory: NetWorthPoint[] = [];
   let loading = false;
   let error = '';
 
+  // Chart dimensions
+  const chartWidth = 600;
+  const chartHeight = 200;
+  const chartPadding = { top: 20, right: 20, bottom: 30, left: 60 };
+
   onMount(async () => {
     await loadUsers();
+    
+    // If navigating from leaderboard with userId and strategyId
+    if (userId && strategyId) {
+      const user = users.find(u => u.id === parseInt(userId));
+      if (user) {
+        await selectUser(user);
+        const strategy = strategies.find(s => s.id === parseInt(strategyId));
+        if (strategy) {
+          await selectStrategy(strategy);
+        }
+      }
+    }
   });
 
   async function loadUsers() {
     loading = true;
     try {
       users = await userApi.getAllUsers();
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : 'An error occurred';
     } finally {
       loading = false;
     }
   }
 
-  async function selectUser(user: any) {
+  async function selectUser(user: User) {
     selectedUser = user;
     selectedStrategy = null;
     portfolio = null;
@@ -37,14 +59,14 @@
     loading = true;
     try {
       strategies = await userApi.getUserStrategies(user.id);
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : 'An error occurred';
     } finally {
       loading = false;
     }
   }
 
-  async function selectStrategy(strategy: any) {
+  async function selectStrategy(strategy: Strategy) {
     selectedStrategy = strategy;
     
     loading = true;
@@ -54,8 +76,8 @@
         tradingApi.getPositions(strategy.id),
         tradingApi.getNetWorthHistory(strategy.id),
       ]);
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : 'An error occurred';
     } finally {
       loading = false;
     }
@@ -73,16 +95,87 @@
     return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`;
   }
 
+  function formatShortCurrency(value: number): string {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+    return `$${value.toFixed(0)}`;
+  }
+
   function goBack() {
     if (selectedStrategy) {
       selectedStrategy = null;
       portfolio = null;
       positions = [];
+      netWorthHistory = [];
+      // Clear URL params when going back
+      goto('/friends', { replaceState: true });
     } else if (selectedUser) {
       selectedUser = null;
       strategies = [];
     }
   }
+
+  // Chart helper functions
+  $: chartData = netWorthHistory.map(p => ({
+    date: new Date(p.recorded_at),
+    value: Number(p.net_worth)
+  })).sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  $: minValue = chartData.length > 0 ? Math.min(...chartData.map(d => d.value)) * 0.98 : 0;
+  $: maxValue = chartData.length > 0 ? Math.max(...chartData.map(d => d.value)) * 1.02 : 100000;
+  $: minDate = chartData.length > 0 ? chartData[0].date.getTime() : 0;
+  $: maxDate = chartData.length > 0 ? chartData[chartData.length - 1].date.getTime() : 1;
+
+  $: innerWidth = chartWidth - chartPadding.left - chartPadding.right;
+  $: innerHeight = chartHeight - chartPadding.top - chartPadding.bottom;
+
+  function scaleX(date: Date): number {
+    if (maxDate === minDate) return chartPadding.left + innerWidth / 2;
+    return chartPadding.left + ((date.getTime() - minDate) / (maxDate - minDate)) * innerWidth;
+  }
+
+  function scaleY(value: number): number {
+    if (maxValue === minValue) return chartPadding.top + innerHeight / 2;
+    return chartPadding.top + innerHeight - ((value - minValue) / (maxValue - minValue)) * innerHeight;
+  }
+
+  $: linePath = chartData.length > 0
+    ? chartData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(d.date)} ${scaleY(d.value)}`).join(' ')
+    : '';
+
+  $: areaPath = chartData.length > 0
+    ? `${linePath} L ${scaleX(chartData[chartData.length - 1].date)} ${chartPadding.top + innerHeight} L ${chartPadding.left} ${chartPadding.top + innerHeight} Z`
+    : '';
+
+  $: yAxisTicks = (() => {
+    const ticks = [];
+    const range = maxValue - minValue;
+    const step = range / 4;
+    for (let i = 0; i <= 4; i++) {
+      ticks.push(minValue + step * i);
+    }
+    return ticks;
+  })();
+
+  $: xAxisTicks = (() => {
+    if (chartData.length === 0) return [];
+    const ticks = [];
+    const count = Math.min(5, chartData.length);
+    const step = Math.floor(chartData.length / count);
+    for (let i = 0; i < chartData.length; i += step) {
+      ticks.push(chartData[i]);
+    }
+    if (chartData.length > 1 && ticks[ticks.length - 1] !== chartData[chartData.length - 1]) {
+      ticks.push(chartData[chartData.length - 1]);
+    }
+    return ticks;
+  })();
+
+  $: startValue = chartData.length > 0 ? chartData[0].value : 100000;
+  $: endValue = chartData.length > 0 ? chartData[chartData.length - 1].value : 100000;
+  $: chartPnl = endValue - startValue;
+  $: chartPnlPercent = startValue > 0 ? ((endValue - startValue) / startValue) * 100 : 0;
+  $: isPositiveChart = chartPnl >= 0;
 </script>
 
 <div class="friends-view">
@@ -165,10 +258,10 @@
               {#each positions as pos}
                 <tr>
                   <td class="symbol">{pos.symbol}</td>
-                  <td>{pos.quantity.toFixed(4)}</td>
-                  <td>{formatCurrency(pos.marketValue)}</td>
-                  <td class:positive={pos.unrealizedPnl >= 0} class:negative={pos.unrealizedPnl < 0}>
-                    {formatCurrency(pos.unrealizedPnl)}
+                  <td>{Number(pos.quantity).toFixed(4)}</td>
+                  <td>{formatCurrency(pos.marketValue ?? 0)}</td>
+                  <td class:positive={(pos.unrealizedPnl ?? 0) >= 0} class:negative={(pos.unrealizedPnl ?? 0) < 0}>
+                    {formatCurrency(pos.unrealizedPnl ?? 0)}
                   </td>
                 </tr>
               {/each}
@@ -179,21 +272,70 @@
 
       <div class="section">
         <h3>Net Worth Over Time</h3>
-        <div class="chart-placeholder">
-          {#if netWorthHistory.length > 0}
-            <!-- Chart would go here -->
-            <div class="chart-data">
-              {#each netWorthHistory.slice(-10) as point}
-                <div class="data-point">
-                  <span class="date">{new Date(point.recorded_at).toLocaleDateString()}</span>
-                  <span class="worth">{formatCurrency(point.net_worth)}</span>
-                </div>
-              {/each}
+        {#if chartData.length > 1}
+          <div class="chart-container">
+            <div class="chart-header">
+              <span class="chart-title">Performance</span>
+              <span class="chart-change" class:positive={isPositiveChart} class:negative={!isPositiveChart}>
+                {formatCurrency(chartPnl)} ({formatPercent(chartPnlPercent)})
+              </span>
             </div>
-          {:else}
-            <div class="empty-small">No history available</div>
-          {/if}
-        </div>
+            <svg viewBox="0 0 {chartWidth} {chartHeight}" class="equity-chart">
+              <!-- Grid lines -->
+              {#each yAxisTicks as tick}
+                <line
+                  x1={chartPadding.left}
+                  y1={scaleY(tick)}
+                  x2={chartWidth - chartPadding.right}
+                  y2={scaleY(tick)}
+                  class="grid-line"
+                />
+              {/each}
+
+              <!-- Area fill -->
+              <path d={areaPath} class="chart-area" class:positive-area={isPositiveChart} class:negative-area={!isPositiveChart} />
+
+              <!-- Line -->
+              <path d={linePath} class="chart-line" class:positive-line={isPositiveChart} class:negative-line={!isPositiveChart} />
+
+              <!-- Data points -->
+              {#each chartData as point}
+                <circle
+                  cx={scaleX(point.date)}
+                  cy={scaleY(point.value)}
+                  r="3"
+                  class="chart-point"
+                  class:positive-point={isPositiveChart}
+                  class:negative-point={!isPositiveChart}
+                />
+              {/each}
+
+              <!-- Y-axis labels -->
+              {#each yAxisTicks as tick}
+                <text
+                  x={chartPadding.left - 8}
+                  y={scaleY(tick)}
+                  class="axis-label y-label"
+                >
+                  {formatShortCurrency(tick)}
+                </text>
+              {/each}
+
+              <!-- X-axis labels -->
+              {#each xAxisTicks as point}
+                <text
+                  x={scaleX(point.date)}
+                  y={chartHeight - 8}
+                  class="axis-label x-label"
+                >
+                  {point.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </text>
+              {/each}
+            </svg>
+          </div>
+        {:else}
+          <div class="empty-small">No history available yet</div>
+        {/if}
       </div>
     </div>
   {/if}
@@ -379,33 +521,93 @@
     color: #007bff;
   }
 
-  .chart-placeholder {
+  /* Chart styles */
+  .chart-container {
     background: white;
-    padding: 1rem;
     border-radius: 8px;
+    padding: 1rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
-  .chart-data {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .data-point {
+  .chart-header {
     display: flex;
     justify-content: space-between;
-    padding: 0.5rem;
-    background: #f8f9fa;
-    border-radius: 4px;
+    align-items: center;
+    margin-bottom: 1rem;
   }
 
-  .data-point .date {
-    color: #666;
+  .chart-title {
+    font-weight: 600;
+    color: #333;
+  }
+
+  .chart-change {
+    font-weight: 500;
     font-size: 0.875rem;
   }
 
-  .data-point .worth {
-    font-weight: 500;
+  .equity-chart {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .grid-line {
+    stroke: #e9ecef;
+    stroke-width: 1;
+  }
+
+  .chart-area {
+    fill-opacity: 0.1;
+  }
+
+  .chart-area.positive-area {
+    fill: #28a745;
+  }
+
+  .chart-area.negative-area {
+    fill: #dc3545;
+  }
+
+  .chart-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .chart-line.positive-line {
+    stroke: #28a745;
+  }
+
+  .chart-line.negative-line {
+    stroke: #dc3545;
+  }
+
+  .chart-point {
+    fill: white;
+    stroke-width: 2;
+  }
+
+  .chart-point.positive-point {
+    stroke: #28a745;
+  }
+
+  .chart-point.negative-point {
+    stroke: #dc3545;
+  }
+
+  .axis-label {
+    font-size: 10px;
+    fill: #666;
+  }
+
+  .y-label {
+    text-anchor: end;
+    dominant-baseline: middle;
+  }
+
+  .x-label {
+    text-anchor: middle;
   }
 </style>

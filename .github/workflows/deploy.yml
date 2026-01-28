@@ -42,9 +42,16 @@ jobs:
 
       - name: Deploy frontend to VPS
         run: |
-          rsync -avz --delete ./frontend/build/ root@${{ vars.VPS_HOST }}:/opt/hotstocks/frontend-build/
+          rsync -avz --delete ./frontend/build/ root@${{ vars.VPS_HOST }}:/var/www/hotstocks/
 
-      - name: Deploy backend and rebuild
+      - name: Deploy backend to VPS
         run: |
-          rsync -avz --exclude 'node_modules' --exclude '.git' ./backend/ root@${{ vars.VPS_HOST }}:/opt/hotstocks/backend/
-          ssh root@${{ vars.VPS_HOST }} "cd /opt/hotstocks && docker compose -f docker-compose.prod.yml up -d --build backend"
+          rsync -avz --exclude 'node_modules' --exclude 'dist' --exclude '.git' ./backend/ root@${{ vars.VPS_HOST }}:/root/hotstocks-backend/
+
+      - name: Deploy docker-compose
+        run: |
+          rsync -avz ./docker-compose.yml root@${{ vars.VPS_HOST }}:/root/
+
+      - name: Rebuild and restart services
+        run: |
+          ssh root@${{ vars.VPS_HOST }} "cd /root && docker compose up -d --build"

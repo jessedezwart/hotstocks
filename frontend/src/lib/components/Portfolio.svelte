@@ -1,12 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { activeStrategy } from '$lib/stores';
-  import { tradingApi } from '$lib/api';
+  import { tradingApi, type Portfolio as PortfolioData, type Position, type NetWorthPoint } from '$lib/api';
 
-  let portfolio: any = null;
-  let positions: any[] = [];
+  let portfolio: PortfolioData | null = null;
+  let positions: Position[] = [];
+  let netWorthHistory: NetWorthPoint[] = [];
   let loading = true;
   let error = '';
+
+  // Chart dimensions
+  const chartWidth = 600;
+  const chartHeight = 200;
+  const chartPadding = { top: 20, right: 20, bottom: 30, left: 60 };
 
   $: if ($activeStrategy) {
     loadPortfolio();
@@ -18,12 +24,13 @@
     loading = true;
     error = '';
     try {
-      [portfolio, positions] = await Promise.all([
+      [portfolio, positions, netWorthHistory] = await Promise.all([
         tradingApi.getPortfolio($activeStrategy.id),
         tradingApi.getPositions($activeStrategy.id),
+        tradingApi.getNetWorthHistory($activeStrategy.id),
       ]);
-    } catch (e: any) {
-      error = e.message;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : 'An error occurred';
     } finally {
       loading = false;
     }
@@ -40,6 +47,74 @@
     const num = Number(value);
     return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`;
   }
+
+  function formatShortCurrency(value: number): string {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+    return `$${value.toFixed(0)}`;
+  }
+
+  // Chart helper functions
+  $: chartData = netWorthHistory.map(p => ({
+    date: new Date(p.recorded_at),
+    value: Number(p.net_worth)
+  })).sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  $: minValue = chartData.length > 0 ? Math.min(...chartData.map(d => d.value)) * 0.98 : 0;
+  $: maxValue = chartData.length > 0 ? Math.max(...chartData.map(d => d.value)) * 1.02 : 100000;
+  $: minDate = chartData.length > 0 ? chartData[0].date.getTime() : 0;
+  $: maxDate = chartData.length > 0 ? chartData[chartData.length - 1].date.getTime() : 1;
+
+  $: innerWidth = chartWidth - chartPadding.left - chartPadding.right;
+  $: innerHeight = chartHeight - chartPadding.top - chartPadding.bottom;
+
+  function scaleX(date: Date): number {
+    if (maxDate === minDate) return chartPadding.left + innerWidth / 2;
+    return chartPadding.left + ((date.getTime() - minDate) / (maxDate - minDate)) * innerWidth;
+  }
+
+  function scaleY(value: number): number {
+    if (maxValue === minValue) return chartPadding.top + innerHeight / 2;
+    return chartPadding.top + innerHeight - ((value - minValue) / (maxValue - minValue)) * innerHeight;
+  }
+
+  $: linePath = chartData.length > 0
+    ? chartData.map((d, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(d.date)} ${scaleY(d.value)}`).join(' ')
+    : '';
+
+  $: areaPath = chartData.length > 0
+    ? `${linePath} L ${scaleX(chartData[chartData.length - 1].date)} ${chartPadding.top + innerHeight} L ${chartPadding.left} ${chartPadding.top + innerHeight} Z`
+    : '';
+
+  $: yAxisTicks = (() => {
+    const ticks = [];
+    const range = maxValue - minValue;
+    const step = range / 4;
+    for (let i = 0; i <= 4; i++) {
+      ticks.push(minValue + step * i);
+    }
+    return ticks;
+  })();
+
+  $: xAxisTicks = (() => {
+    if (chartData.length === 0) return [];
+    const ticks = [];
+    const count = Math.min(5, chartData.length);
+    const step = Math.floor(chartData.length / count);
+    for (let i = 0; i < chartData.length; i += step) {
+      ticks.push(chartData[i]);
+    }
+    if (chartData.length > 1 && ticks[ticks.length - 1] !== chartData[chartData.length - 1]) {
+      ticks.push(chartData[chartData.length - 1]);
+    }
+    return ticks;
+  })();
+
+  $: startValue = chartData.length > 0 ? chartData[0].value : 100000;
+  $: endValue = chartData.length > 0 ? chartData[chartData.length - 1].value : 100000;
+  $: chartPnl = endValue - startValue;
+  $: chartPnlPercent = startValue > 0 ? ((endValue - startValue) / startValue) * 100 : 0;
+  $: isPositiveChart = chartPnl >= 0;
 </script>
 
 <div class="portfolio">
@@ -71,6 +146,77 @@
       </div>
     </div>
 
+    <!-- Net Worth Chart -->
+    <div class="section chart-section">
+      <h3>Performance Over Time</h3>
+      {#if chartData.length > 1}
+        <div class="chart-container">
+          <div class="chart-header">
+            <span class="chart-title">Net Worth</span>
+            <span class="chart-change" class:positive={isPositiveChart} class:negative={!isPositiveChart}>
+              {formatCurrency(chartPnl)} ({formatPercent(chartPnlPercent)})
+            </span>
+          </div>
+          <svg viewBox="0 0 {chartWidth} {chartHeight}" class="equity-chart">
+            <!-- Grid lines -->
+            {#each yAxisTicks as tick}
+              <line
+                x1={chartPadding.left}
+                y1={scaleY(tick)}
+                x2={chartWidth - chartPadding.right}
+                y2={scaleY(tick)}
+                class="grid-line"
+              />
+            {/each}
+
+            <!-- Area fill -->
+            <path d={areaPath} class="chart-area" class:positive-area={isPositiveChart} class:negative-area={!isPositiveChart} />
+
+            <!-- Line -->
+            <path d={linePath} class="chart-line" class:positive-line={isPositiveChart} class:negative-line={!isPositiveChart} />
+
+            <!-- Data points -->
+            {#each chartData as point}
+              <circle
+                cx={scaleX(point.date)}
+                cy={scaleY(point.value)}
+                r="3"
+                class="chart-point"
+                class:positive-point={isPositiveChart}
+                class:negative-point={!isPositiveChart}
+              />
+            {/each}
+
+            <!-- Y-axis labels -->
+            {#each yAxisTicks as tick}
+              <text
+                x={chartPadding.left - 8}
+                y={scaleY(tick)}
+                class="axis-label y-label"
+              >
+                {formatShortCurrency(tick)}
+              </text>
+            {/each}
+
+            <!-- X-axis labels -->
+            {#each xAxisTicks as point}
+              <text
+                x={scaleX(point.date)}
+                y={chartHeight - 8}
+                class="axis-label x-label"
+              >
+                {point.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </text>
+            {/each}
+          </svg>
+        </div>
+      {:else}
+        <div class="empty-small">
+          Performance chart will appear after more trading activity.
+        </div>
+      {/if}
+    </div>
+
     <div class="section">
       <h3>Positions</h3>
       {#if positions.length === 0}
@@ -95,10 +241,10 @@
                 <td>{pos.asset_type}</td>
                 <td>{Number(pos.quantity).toFixed(4)}</td>
                 <td>{formatCurrency(Number(pos.average_cost))}</td>
-                <td>{formatCurrency(pos.currentPrice)}</td>
-                <td>{formatCurrency(pos.marketValue)}</td>
-                <td class:positive={pos.unrealizedPnl >= 0} class:negative={pos.unrealizedPnl < 0}>
-                  {formatCurrency(pos.unrealizedPnl)} ({formatPercent(pos.unrealizedPnlPercent)})
+                <td>{formatCurrency(pos.currentPrice ?? 0)}</td>
+                <td>{formatCurrency(pos.marketValue ?? 0)}</td>
+                <td class:positive={(pos.unrealizedPnl ?? 0) >= 0} class:negative={(pos.unrealizedPnl ?? 0) < 0}>
+                  {formatCurrency(pos.unrealizedPnl ?? 0)} ({formatPercent(pos.unrealizedPnlPercent ?? 0)})
                 </td>
               </tr>
             {/each}
@@ -111,13 +257,13 @@
       <div class="allocation-card">
         <h4>By Asset Type</h4>
         <div class="allocation-list">
-          {#each Object.entries(portfolio.allocationByType) as [type, value]}
+          {#each Object.entries(portfolio.allocationByType ?? {}) as [type, value]}
             <div class="allocation-item">
               <span class="type">{type}</span>
               <span class="amount">{formatCurrency(value as number)}</span>
             </div>
           {/each}
-          {#if Object.keys(portfolio.allocationByType).length === 0}
+          {#if Object.keys(portfolio.allocationByType ?? {}).length === 0}
             <div class="empty-small">No allocations</div>
           {/if}
         </div>
@@ -126,13 +272,13 @@
       <div class="allocation-card">
         <h4>By Currency</h4>
         <div class="allocation-list">
-          {#each Object.entries(portfolio.allocationByCurrency) as [currency, value]}
+          {#each Object.entries(portfolio.allocationByCurrency ?? {}) as [currency, value]}
             <div class="allocation-item">
               <span class="type">{currency}</span>
               <span class="amount">{formatCurrency(value as number)}</span>
             </div>
           {/each}
-          {#if Object.keys(portfolio.allocationByCurrency).length === 0}
+          {#if Object.keys(portfolio.allocationByCurrency ?? {}).length === 0}
             <div class="empty-small">No allocations</div>
           {/if}
         </div>
@@ -284,5 +430,99 @@
 
   .allocation-item .amount {
     font-weight: 500;
+  }
+
+  /* Chart styles */
+  .chart-section {
+    margin-bottom: 2rem;
+  }
+
+  .chart-container {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .chart-title {
+    font-weight: 600;
+    color: #333;
+  }
+
+  .chart-change {
+    font-weight: 500;
+    font-size: 0.875rem;
+  }
+
+  .equity-chart {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .grid-line {
+    stroke: #e9ecef;
+    stroke-width: 1;
+  }
+
+  .chart-area {
+    fill-opacity: 0.1;
+  }
+
+  .chart-area.positive-area {
+    fill: #28a745;
+  }
+
+  .chart-area.negative-area {
+    fill: #dc3545;
+  }
+
+  .chart-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .chart-line.positive-line {
+    stroke: #28a745;
+  }
+
+  .chart-line.negative-line {
+    stroke: #dc3545;
+  }
+
+  .chart-point {
+    fill: white;
+    stroke-width: 2;
+  }
+
+  .chart-point.positive-point {
+    stroke: #28a745;
+  }
+
+  .chart-point.negative-point {
+    stroke: #dc3545;
+  }
+
+  .axis-label {
+    font-size: 10px;
+    fill: #666;
+  }
+
+  .y-label {
+    text-anchor: end;
+    dominant-baseline: middle;
+  }
+
+  .x-label {
+    text-anchor: middle;
   }
 </style>

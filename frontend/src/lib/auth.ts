@@ -99,8 +99,8 @@ export async function getAccessToken(): Promise<string | null> {
     const token = await client.getTokenSilently();
     accessToken.set(token);
     return token;
-  } catch (err: any) {
-    if (err.error === 'login_required') {
+  } catch (err) {
+    if (err && typeof err === 'object' && 'error' in err && err.error === 'login_required') {
       await login();
     }
     return null;

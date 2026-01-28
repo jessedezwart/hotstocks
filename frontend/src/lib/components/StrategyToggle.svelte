@@ -56,7 +56,6 @@
             bind:value={editName}
             onkeydown={handleKeydown}
             disabled={saving}
-            autofocus
           />
           <button class="save-btn" onclick={saveEdit} disabled={saving}>✓</button>
           <button class="cancel-btn" onclick={cancelEdit} disabled={saving}>✕</button>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { leaderboardApi } from '$lib/api';
 
   let leaderboard: any[] = [];
@@ -20,6 +21,10 @@
     } finally {
       loading = false;
     }
+  }
+
+  function viewUser(entry: any) {
+    goto(`/friends?userId=${entry.userId}&strategyId=${entry.strategyId}`);
   }
 
   function formatCurrency(value: number): string {
@@ -65,7 +70,7 @@
       </thead>
       <tbody>
         {#each leaderboard as entry}
-          <tr class={getRankClass(entry.rank)}>
+          <tr class="{getRankClass(entry.rank)} clickable" onclick={() => viewUser(entry)}>
             <td class="rank">
               {#if entry.rank === 1}🥇
               {:else if entry.rank === 2}🥈
@@ -169,5 +174,26 @@
 
   tr.bronze {
     background: linear-gradient(90deg, rgba(205, 127, 50, 0.1) 0%, transparent 100%);
+  }
+
+  tr.clickable {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+
+  tr.clickable:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+  }
+
+  tr.clickable.gold:hover {
+    background: linear-gradient(90deg, rgba(255, 215, 0, 0.2) 0%, rgba(0, 123, 255, 0.05) 100%);
+  }
+
+  tr.clickable.silver:hover {
+    background: linear-gradient(90deg, rgba(192, 192, 192, 0.2) 0%, rgba(0, 123, 255, 0.05) 100%);
+  }
+
+  tr.clickable.bronze:hover {
+    background: linear-gradient(90deg, rgba(205, 127, 50, 0.2) 0%, rgba(0, 123, 255, 0.05) 100%);
   }
 </style>

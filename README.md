@@ -26,7 +26,7 @@ A virtual trading game for a private group of friends. Each user starts with $10
 - Node.js 18+
 - PostgreSQL 14+
 - Auth0 account
-- Alpha Vantage API key (free at https://www.alphavantage.co/support/#api-key)
+- Alpha Vantage API key (free at <https://www.alphavantage.co/support/#api-key>)
 
 ## Setup
 
@@ -64,6 +64,7 @@ psql -d hotstocks -f sql/schema.sql
 ### 4. Environment Variables
 
 **Backend** (`backend/.env`):
+
 ```env
 PORT=3000
 HOST=0.0.0.0
@@ -76,6 +77,7 @@ STARTING_BALANCE=100000
 ```
 
 **Frontend** (`frontend/.env`):
+
 ```env
 VITE_AUTH0_DOMAIN=your-tenant.auth0.com
 VITE_AUTH0_CLIENT_ID=your-client-id
@@ -95,33 +97,38 @@ cd frontend
 npm run dev
 ```
 
-Open http://localhost:5173 in your browser.
+Open <http://localhost:5173> in your browser.
 
 ## API Endpoints
 
 ### Users
+
 - `GET /api/users/me` - Get current user
 - `GET /api/users/me/strategies` - Get user's strategies
 - `GET /api/users` - Get all users (friends)
 - `GET /api/users/:userId/strategies` - Get a friend's strategies
 
 ### Trading
+
 - `POST /api/trade` - Execute a trade
 - `GET /api/strategies/:strategyId/positions` - Get positions
 - `GET /api/strategies/:strategyId/portfolio` - Get portfolio summary
 - `GET /api/strategies/:strategyId/net-worth-history` - Get equity curve data
 
 ### Market Data
+
 - `GET /api/market/search?q=` - Search symbols
 - `GET /api/market/quote/:symbol` - Get quote
 - `GET /api/market/chart/:symbol` - Get chart data
 - `WS /api/market/stream` - WebSocket for real-time quotes
 
 ### Ledger
+
 - `GET /api/strategies/:strategyId/ledger` - Get transaction history
 - `GET /api/strategies/:strategyId/ledger/export` - Export CSV
 
 ### Leaderboard
+
 - `GET /api/leaderboard` - Get rankings
 
 ## Trading Rules
@@ -134,7 +141,7 @@ Open http://localhost:5173 in your browser.
 
 ## Project Structure
 
-```
+```text
 hotstocks/
 ├── backend/
 │   ├── sql/

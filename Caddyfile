@@ -1,0 +1,10 @@
+hotones.nl {
+	root * /var/www/hotstocks
+	encode gzip
+	try_files {path} /index.html
+	file_server
+}
+
+api.hotones.nl {
+	reverse_proxy localhost:3000
+}
