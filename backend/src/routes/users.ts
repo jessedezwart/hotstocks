@@ -90,6 +90,56 @@ export async function userRoutes(fastify: FastifyInstance): Promise<void> {
     return strategies;
   });
 
+  // Create a new strategy
+  fastify.post('/api/users/me/strategies', { preHandler: authenticate }, async (request, reply) => {
+    const auth0Id = request.user!.sub;
+    const { name } = request.body as { name?: string };
+
+    const trimmedName = name?.trim() ?? '';
+
+    if (trimmedName.length === 0) {
+      return reply.code(400).send({ error: 'Strategy name is required' });
+    }
+
+    if (trimmedName.length > 100) {
+      return reply.code(400).send({ error: 'Strategy name must be 100 characters or less' });
+    }
+
+    // Get user
+    const user = await queryOne<User>(
+      'SELECT * FROM users WHERE auth0_id = $1',
+      [auth0Id]
+    );
+
+    if (!user) {
+      return reply.code(404).send({ error: 'User not found' });
+    }
+
+    // Check if name already exists for this user
+    const existing = await queryOne<{ id: number }>(
+      'SELECT id FROM strategies WHERE user_id = $1 AND name = $2',
+      [user.id, trimmedName]
+    );
+
+    if (existing) {
+      return reply.code(409).send({ error: 'Strategy name already in use' });
+    }
+
+    try {
+      const strategy = await queryOne<Strategy>(
+        `INSERT INTO strategies (user_id, name, cash_balance)
+         VALUES ($1, $2, 100000.00)
+         RETURNING *`,
+        [user.id, trimmedName]
+      );
+
+      return strategy;
+    } catch (err) {
+      request.log.error({ err }, 'Failed to create strategy');
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  });
+
   // Get all users (friends)
   fastify.get('/api/users', { preHandler: authenticate }, async (request, reply) => {
     const users = await query<User>(

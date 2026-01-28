@@ -156,6 +156,10 @@ export const userApi = {
     body: { email, displayName },
   }),
   getMyStrategies: () => apiRequest<Strategy[]>('/api/users/me/strategies'),
+  createStrategy: (name: string) => apiRequest<Strategy>('/api/users/me/strategies', {
+    method: 'POST',
+    body: { name },
+  }),
   getAllUsers: () => apiRequest<User[]>('/api/users'),
   getUserStrategies: (userId: number) => apiRequest<Strategy[]>(`/api/users/${userId}/strategies`),
   updateProfile: (displayName: string) => apiRequest<User>('/api/users/me', {

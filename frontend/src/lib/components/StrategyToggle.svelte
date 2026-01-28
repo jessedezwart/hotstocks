@@ -5,6 +5,10 @@
   let editingId: number | null = null;
   let editName = '';
   let saving = false;
+  let showAddForm = false;
+  let newStrategyName = '';
+  let addingStrategy = false;
+  let addError = '';
   
   function selectStrategy(id: number) {
     activeStrategyId.set(id);
@@ -43,6 +47,41 @@
     if (e.key === 'Enter') saveEdit();
     else if (e.key === 'Escape') cancelEdit();
   }
+
+  function startAdd() {
+    showAddForm = true;
+    newStrategyName = '';
+    addError = '';
+  }
+
+  async function addStrategy() {
+    if (!newStrategyName.trim()) return;
+
+    addingStrategy = true;
+    addError = '';
+    try {
+      const newStrategy = await userApi.createStrategy(newStrategyName.trim());
+      strategies.update(strats => [...strats, newStrategy]);
+      activeStrategyId.set(newStrategy.id);
+      showAddForm = false;
+      newStrategyName = '';
+    } catch (e: any) {
+      addError = e.message || 'Failed to create strategy';
+    } finally {
+      addingStrategy = false;
+    }
+  }
+
+  function cancelAdd() {
+    showAddForm = false;
+    newStrategyName = '';
+    addError = '';
+  }
+
+  function handleAddKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') addStrategy();
+    else if (e.key === 'Escape') cancelAdd();
+  }
 </script>
 
 <div class="strategy-toggle">
@@ -72,7 +111,26 @@
         </button>
       {/if}
     {/each}
+    
+    {#if showAddForm}
+      <div class="edit-container">
+        <input
+          type="text"
+          bind:value={newStrategyName}
+          onkeydown={handleAddKeydown}
+          disabled={addingStrategy}
+          placeholder="Strategy name"
+        />
+        <button class="save-btn" onclick={addStrategy} disabled={addingStrategy || !newStrategyName.trim()}>✓</button>
+        <button class="cancel-btn" onclick={cancelAdd} disabled={addingStrategy}>✕</button>
+      </div>
+    {:else}
+      <button class="add-btn" onclick={startAdd} title="Add new strategy">+</button>
+    {/if}
   </div>
+  {#if addError}
+    <span class="error">{addError}</span>
+  {/if}
 </div>
 
 <style>
@@ -146,6 +204,29 @@
   .save-btn:disabled, .cancel-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .add-btn {
+    padding: 0.375rem 0.75rem;
+    border: 1px dashed #28a745;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1rem;
+    color: #28a745;
+    transition: all 0.15s ease;
+  }
+
+  .add-btn:hover {
+    background: #28a745;
+    color: white;
+  }
+
+  .error {
+    color: #dc3545;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
   }
 
   /* Mobile Responsive */
