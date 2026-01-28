@@ -54,6 +54,10 @@
     return `$${value.toFixed(0)}`;
   }
 
+  function buildSymbolLink(symbol: string): string {
+    return `/?symbol=${encodeURIComponent(symbol)}`;
+  }
+
   // Chart helper functions
   $: chartData = netWorthHistory.map(p => ({
     date: new Date(p.recorded_at),
@@ -237,7 +241,9 @@
           <tbody>
             {#each positions as pos}
               <tr>
-                <td class="symbol">{pos.symbol}</td>
+                <td class="symbol">
+                  <a class="symbol-link" href={buildSymbolLink(pos.symbol)}>{pos.symbol}</a>
+                </td>
                 <td>{pos.asset_type}</td>
                 <td>{Number(pos.quantity).toFixed(4)}</td>
                 <td>{formatCurrency(Number(pos.average_cost))}</td>
@@ -386,6 +392,15 @@
   .positions-table .symbol {
     font-weight: 600;
     color: #007bff;
+  }
+
+  .symbol-link {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .symbol-link:hover {
+    text-decoration: underline;
   }
 
   .allocations {

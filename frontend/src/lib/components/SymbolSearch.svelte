@@ -4,11 +4,45 @@
 
   const dispatch = createEventDispatcher();
 
+  export let initialQuery = '';
+  export let autoSelectExact = false;
+
   let query = '';
   let results: any[] = [];
   let loading = false;
   let showResults = false;
   let debounceTimer: ReturnType<typeof setTimeout>;
+  let lastInitialQuery = '';
+
+  async function runSearch(value: string, selectExact = false) {
+    if (value.length < 1) {
+      results = [];
+      showResults = false;
+      return;
+    }
+
+    loading = true;
+    try {
+      results = await marketApi.search(value);
+
+      if (selectExact) {
+        const match = results.find(result =>
+          result.symbol?.toUpperCase() === value.toUpperCase()
+        );
+        if (match) {
+          selectSymbol(match);
+          return;
+        }
+      }
+
+      showResults = true;
+    } catch (e) {
+      console.error('Search error:', e);
+      results = [];
+    } finally {
+      loading = false;
+    }
+  }
 
   function handleInput() {
     clearTimeout(debounceTimer);
@@ -19,16 +53,7 @@
     }
     
     debounceTimer = setTimeout(async () => {
-      loading = true;
-      try {
-        results = await marketApi.search(query);
-        showResults = true;
-      } catch (e) {
-        console.error('Search error:', e);
-        results = [];
-      } finally {
-        loading = false;
-      }
+      await runSearch(query);
     }, 300);
   }
 
@@ -42,6 +67,12 @@
     setTimeout(() => {
       showResults = false;
     }, 200);
+  }
+
+  $: if (initialQuery && initialQuery !== lastInitialQuery) {
+    lastInitialQuery = initialQuery;
+    query = initialQuery;
+    runSearch(initialQuery, autoSelectExact);
   }
 </script>
 

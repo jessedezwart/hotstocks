@@ -1,9 +1,17 @@
 <script lang="ts">
+  import { page } from '$app/stores';
   import SymbolSearch from '$lib/components/SymbolSearch.svelte';
   import QuoteView from '$lib/components/QuoteView.svelte';
   import TradeTicket from '$lib/components/TradeTicket.svelte';
 
   let selectedSymbol: any = null;
+  let lastSymbolParam = '';
+
+  $: symbolParam = $page.url.searchParams.get('symbol') ?? '';
+  $: if (symbolParam && symbolParam !== lastSymbolParam) {
+    lastSymbolParam = symbolParam;
+    selectedSymbol = null;
+  }
 
   function handleSymbolSelect(event: CustomEvent) {
     selectedSymbol = event.detail;
@@ -19,7 +27,11 @@
   <h2>Search & Trade</h2>
   
   <div class="search-section">
-    <SymbolSearch on:select={handleSymbolSelect} />
+    <SymbolSearch
+      initialQuery={symbolParam}
+      autoSelectExact={true}
+      on:select={handleSymbolSelect}
+    />
   </div>
 
   {#if selectedSymbol}

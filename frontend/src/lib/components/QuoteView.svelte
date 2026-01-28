@@ -11,6 +11,11 @@
   let error = '';
   let quoteStream: ReturnType<typeof createQuoteStream> | null = null;
 
+  // Chart dimensions
+  const chartWidth = 600;
+  const chartHeight = 200;
+  const chartPadding = { top: 20, right: 20, bottom: 30, left: 60 };
+
   onMount(async () => {
     await loadData();
     setupStream();
@@ -48,6 +53,74 @@
   }
 
   $: priceClass = quote?.change >= 0 ? 'positive' : 'negative';
+
+  // Chart helper functions
+  $: chartPoints = chartData
+    .map((p) => ({
+      date: new Date(p.timestamp),
+      value: Number(p.close),
+    }))
+    .filter((p) => !Number.isNaN(p.value))
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  $: minValue = chartPoints.length > 0 ? Math.min(...chartPoints.map((d) => d.value)) * 0.98 : 0;
+  $: maxValue = chartPoints.length > 0 ? Math.max(...chartPoints.map((d) => d.value)) * 1.02 : 1;
+  $: minDate = chartPoints.length > 0 ? chartPoints[0].date.getTime() : 0;
+  $: maxDate = chartPoints.length > 0 ? chartPoints[chartPoints.length - 1].date.getTime() : 1;
+
+  $: innerWidth = chartWidth - chartPadding.left - chartPadding.right;
+  $: innerHeight = chartHeight - chartPadding.top - chartPadding.bottom;
+
+  function scaleX(date: Date): number {
+    if (maxDate === minDate) return chartPadding.left + innerWidth / 2;
+    return chartPadding.left + ((date.getTime() - minDate) / (maxDate - minDate)) * innerWidth;
+  }
+
+  function scaleY(value: number): number {
+    if (maxValue === minValue) return chartPadding.top + innerHeight / 2;
+    return chartPadding.top + innerHeight - ((value - minValue) / (maxValue - minValue)) * innerHeight;
+  }
+
+  $: linePath = chartPoints.length > 0
+    ? chartPoints.map((d, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(d.date)} ${scaleY(d.value)}`).join(' ')
+    : '';
+
+  $: areaPath = chartPoints.length > 0
+    ? `${linePath} L ${scaleX(chartPoints[chartPoints.length - 1].date)} ${chartPadding.top + innerHeight} L ${chartPadding.left} ${chartPadding.top + innerHeight} Z`
+    : '';
+
+  $: yAxisTicks = (() => {
+    const ticks = [];
+    const range = maxValue - minValue;
+    const step = range / 4;
+    for (let i = 0; i <= 4; i++) {
+      ticks.push(minValue + step * i);
+    }
+    return ticks;
+  })();
+
+  $: xAxisTicks = (() => {
+    if (chartPoints.length === 0) return [];
+    const ticks = [];
+    const count = Math.min(5, chartPoints.length);
+    const step = Math.floor(chartPoints.length / count);
+    for (let i = 0; i < chartPoints.length; i += step) {
+      ticks.push(chartPoints[i]);
+    }
+    if (chartPoints.length > 1 && ticks[ticks.length - 1] !== chartPoints[chartPoints.length - 1]) {
+      ticks.push(chartPoints[chartPoints.length - 1]);
+    }
+    return ticks;
+  })();
+
+  $: startValue = chartPoints.length > 0 ? chartPoints[0].value : 0;
+  $: endValue = chartPoints.length > 0 ? chartPoints[chartPoints.length - 1].value : 0;
+  $: isPositiveChart = endValue - startValue >= 0;
+
+  function formatShortCurrency(value: number): string {
+    if (value >= 1000) return `$${value.toFixed(0)}`;
+    return `$${value.toFixed(2)}`;
+  }
 </script>
 
 <div class="quote-view">
@@ -67,9 +140,48 @@
       </div>
     </div>
 
-    {#if showChart && chartData.length > 0}
+    {#if showChart && chartPoints.length > 0}
       <div class="chart-container">
-        <canvas id="price-chart"></canvas>
+        <svg viewBox="0 0 {chartWidth} {chartHeight}" class="price-chart">
+          <!-- Grid lines -->
+          {#each yAxisTicks as tick}
+            <line
+              x1={chartPadding.left}
+              y1={scaleY(tick)}
+              x2={chartWidth - chartPadding.right}
+              y2={scaleY(tick)}
+              class="grid-line"
+            />
+          {/each}
+
+          <!-- Area fill -->
+          <path d={areaPath} class="chart-area" class:positive-area={isPositiveChart} class:negative-area={!isPositiveChart} />
+
+          <!-- Line -->
+          <path d={linePath} class="chart-line" class:positive-line={isPositiveChart} class:negative-line={!isPositiveChart} />
+
+          <!-- Y-axis labels -->
+          {#each yAxisTicks as tick}
+            <text
+              x={chartPadding.left - 8}
+              y={scaleY(tick)}
+              class="axis-label y-label"
+            >
+              {formatShortCurrency(tick)}
+            </text>
+          {/each}
+
+          <!-- X-axis labels -->
+          {#each xAxisTicks as point}
+            <text
+              x={scaleX(point.date)}
+              y={chartHeight - 8}
+              class="axis-label x-label"
+            >
+              {point.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </text>
+          {/each}
+        </svg>
       </div>
     {/if}
 
@@ -139,14 +251,62 @@
   }
 
   .chart-container {
-    height: 300px;
     margin: 1rem 0;
     background: #f8f9fa;
     border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #666;
+    padding: 1rem;
+  }
+
+  .price-chart {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .grid-line {
+    stroke: #e9ecef;
+    stroke-width: 1;
+  }
+
+  .chart-area {
+    fill-opacity: 0.1;
+  }
+
+  .chart-area.positive-area {
+    fill: #28a745;
+  }
+
+  .chart-area.negative-area {
+    fill: #dc3545;
+  }
+
+  .chart-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .chart-line.positive-line {
+    stroke: #28a745;
+  }
+
+  .chart-line.negative-line {
+    stroke: #dc3545;
+  }
+
+  .axis-label {
+    font-size: 10px;
+    fill: #666;
+  }
+
+  .y-label {
+    text-anchor: end;
+    dominant-baseline: middle;
+  }
+
+  .x-label {
+    text-anchor: middle;
   }
 
   .quote-details {
@@ -193,7 +353,7 @@
     }
 
     .chart-container {
-      height: 200px;
+      padding: 0.75rem;
     }
 
     .quote-details {

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { authenticate } from '../auth.js';
-import { query, queryOne } from '../db.js';
+import { execute, query, queryOne } from '../db.js';
 import { getQuote } from '../marketData.js';
 import { config } from '../config.js';
 
@@ -31,6 +31,60 @@ interface TradeRequest {
   assetType: 'stock' | 'etf' | 'crypto';
   exchange?: string;
   currency?: string;
+}
+
+const SNAPSHOT_MIN_INTERVAL_MINUTES = 60;
+const MS_PER_MINUTE = 60 * 1000;
+
+async function computeNetWorth(strategyId: number): Promise<number | null> {
+  const strategy = await queryOne<Strategy>('SELECT * FROM strategies WHERE id = $1', [strategyId]);
+  if (!strategy) return null;
+
+  const positions = await query<Position>(
+    'SELECT * FROM positions WHERE strategy_id = $1',
+    [strategyId]
+  );
+
+  const marketValues = await Promise.all(
+    positions.map(async (pos) => {
+      const quote = await getQuote(pos.symbol);
+      const currentPrice = quote?.price || parseFloat(pos.average_cost.toString());
+      const quantity = parseFloat(pos.quantity.toString());
+      return quantity * currentPrice;
+    })
+  );
+
+  const totalMarketValue = marketValues.reduce((sum, value) => sum + value, 0);
+
+  const cashBalance = parseFloat(strategy.cash_balance.toString());
+  return cashBalance + totalMarketValue;
+}
+
+async function insertNetWorthSnapshot(strategyId: number, netWorth: number): Promise<void> {
+  await execute(
+    'INSERT INTO net_worth_history (strategy_id, net_worth) VALUES ($1, $2)',
+    [strategyId, netWorth]
+  );
+}
+
+async function maybeSnapshotNetWorth(strategyId: number, netWorth: number): Promise<void> {
+  const latest = await queryOne<{ recorded_at: string }>(
+    `SELECT recorded_at FROM net_worth_history 
+     WHERE strategy_id = $1 
+     ORDER BY recorded_at DESC 
+     LIMIT 1`,
+    [strategyId]
+  );
+
+  if (!latest) {
+    await insertNetWorthSnapshot(strategyId, netWorth);
+    return;
+  }
+
+  const ageMs = Date.now() - new Date(latest.recorded_at).getTime();
+  if (ageMs >= SNAPSHOT_MIN_INTERVAL_MINUTES * MS_PER_MINUTE) {
+    await insertNetWorthSnapshot(strategyId, netWorth);
+  }
 }
 
 export async function tradingRoutes(fastify: FastifyInstance): Promise<void> {
@@ -167,6 +221,15 @@ export async function tradingRoutes(fastify: FastifyInstance): Promise<void> {
 
       await client.query('COMMIT');
 
+      try {
+        const netWorth = await computeNetWorth(trade.strategyId);
+        if (netWorth !== null) {
+          await insertNetWorthSnapshot(trade.strategyId, netWorth);
+        }
+      } catch (snapshotError) {
+        request.log.error({ err: snapshotError }, 'Failed to snapshot net worth after trade');
+      }
+
       return {
         success: true,
         fill: {
@@ -285,6 +348,12 @@ export async function tradingRoutes(fastify: FastifyInstance): Promise<void> {
       const netWorth = cashBalance + totalMarketValue;
       const totalPnl = netWorth - config.trading.startingBalance;
       const totalPnlPercent = (totalPnl / config.trading.startingBalance) * 100;
+
+      try {
+        await maybeSnapshotNetWorth(strategyId, netWorth);
+      } catch (snapshotError) {
+        request.log.error({ err: snapshotError }, 'Failed to snapshot net worth on portfolio load');
+      }
 
       return {
         strategyId,

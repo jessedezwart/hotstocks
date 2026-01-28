@@ -5,6 +5,8 @@
 
   const dispatch = createEventDispatcher();
 
+  const COMMISSION = 4.95;
+
   export let symbol = '';
   export let assetType: 'stock' | 'etf' | 'crypto' = 'stock';
   export let exchange = '';
@@ -38,10 +40,10 @@
   $: estimatedTotal = (() => {
     if (!quote) return 0;
     if (inputMode === 'shares' && quantity) {
-      return parseFloat(quantity) * quote.price + 4.95;
+      return parseFloat(quantity) * quote.price + COMMISSION;
     }
     if (inputMode === 'dollars' && notionalAmount) {
-      return parseFloat(notionalAmount) + 4.95;
+      return parseFloat(notionalAmount) + COMMISSION;
     }
     return 0;
   })();
@@ -56,6 +58,30 @@
     }
     return 0;
   })();
+
+  $: availableCash = (() => {
+    if (!$activeStrategy) return 0;
+    const cash = Number($activeStrategy.cash_balance);
+    return Number.isFinite(cash) ? cash : 0;
+  })();
+
+  $: maxBuyNotional = Math.max(availableCash - COMMISSION, 0);
+
+  $: maxBuyShares = (() => {
+    if (!quote || !Number.isFinite(quote.price) || quote.price <= 0) return 0;
+    return maxBuyNotional / quote.price;
+  })();
+
+  function applyMaxBuy() {
+    if (!quote || maxBuyNotional <= 0) return;
+    if (inputMode === 'shares') {
+      quantity = maxBuyShares ? maxBuyShares.toFixed(6) : '';
+      notionalAmount = '';
+    } else {
+      notionalAmount = maxBuyNotional ? maxBuyNotional.toFixed(2) : '';
+      quantity = '';
+    }
+  }
 
   async function submitOrder() {
     if (!$activeStrategy) {
@@ -167,14 +193,34 @@
       </div>
     {/if}
 
+    {#if side === 'buy'}
+      <div class="max-buy">
+        <button
+          class="max-btn"
+          type="button"
+          onclick={applyMaxBuy}
+          disabled={!quote || maxBuyNotional <= 0}
+        >
+          Max
+        </button>
+        <span class="max-text">Available to spend: ${Number(maxBuyNotional).toFixed(2)}</span>
+      </div>
+    {/if}
+
     <div class="order-summary">
+      {#if side === 'buy'}
+        <div class="summary-row">
+          <span>Max to Spend</span>
+          <span>${Number(maxBuyNotional).toFixed(2)}</span>
+        </div>
+      {/if}
       <div class="summary-row">
         <span>Estimated Shares</span>
         <span>{Number(estimatedShares).toFixed(4)}</span>
       </div>
       <div class="summary-row">
         <span>Commission</span>
-        <span>$4.95</span>
+        <span>${COMMISSION.toFixed(2)}</span>
       </div>
       <div class="summary-row total">
         <span>Estimated Total</span>
@@ -296,6 +342,40 @@
 
   .input-group input:focus {
     border-color: #007bff;
+  }
+
+  .max-buy {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: -0.5rem 0 1rem;
+    font-size: 0.875rem;
+    color: #555;
+  }
+
+  .max-btn {
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .max-btn:hover:not(:disabled) {
+    border-color: #28a745;
+    color: #28a745;
+  }
+
+  .max-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .max-text {
+    color: #666;
   }
 
   .order-summary {
