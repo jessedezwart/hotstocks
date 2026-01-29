@@ -53,11 +53,11 @@ jobs:
 
       - name: Deploy frontend to VPS
         run: |
-          rsync -avz --delete ./frontend/build/ root@${{ vars.VPS_HOST }}:/var/www/hotstocks/
+          rsync -avz --delete --exclude 'node_modules' --exclude 'build' --exclude '.svelte-kit' ./frontend/ root@${{ vars.VPS_HOST }}:/root/frontend/
 
       - name: Deploy backend to VPS
         run: |
-          rsync -avz --exclude 'node_modules' --exclude 'dist' --exclude '.git' ./backend/ root@${{ vars.VPS_HOST }}:/root/hotstocks-backend/
+          rsync -avz --exclude 'node_modules' --exclude 'dist' --exclude '.git' ./backend/ root@${{ vars.VPS_HOST }}:/root/backend/
 
       - name: Deploy docker-compose
         run: |

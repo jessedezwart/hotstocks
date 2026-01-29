@@ -35,7 +35,7 @@ services:
   # Backend API
   backend:
     build:
-      context: ./hotstocks-backend
+      context: ./backend
       dockerfile: Dockerfile
     container_name: hotstocks-backend
     restart: unless-stopped
@@ -46,7 +46,6 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       AUTH0_DOMAIN: ${AUTH0_DOMAIN}
       AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
-      ALPHA_VANTAGE_API_KEY: ${ALPHA_VANTAGE_API_KEY}
     ports:
       - "3000:3000"
     depends_on:
@@ -67,6 +66,28 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
+
+  # Frontend (SvelteKit SSR)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_AUTH0_DOMAIN: ${VITE_AUTH0_DOMAIN}
+        VITE_AUTH0_CLIENT_ID: ${VITE_AUTH0_CLIENT_ID}
+        VITE_AUTH0_AUDIENCE: ${VITE_AUTH0_AUDIENCE}
+    container_name: hotstocks-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4173
+    ports:
+      - "4173:4173"
+    depends_on:
+      backend:
+        condition: service_started
 
 volumes:
   postgres_data:

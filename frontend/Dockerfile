@@ -27,20 +27,30 @@ ENV VITE_AUTH0_AUDIENCE=$VITE_AUTH0_AUDIENCE
 # Build the application
 RUN npm run build
 
-# Production stage - using nginx for serving static files
-FROM nginx:alpine AS production
+# Production stage
+FROM node:22-alpine AS production
 
-# Copy custom nginx config for SPA
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies only
+RUN npm ci --omit=dev
 
 # Copy built files from builder
-COPY --from=builder /app/build /usr/share/nginx/html
+COPY --from=builder /app/build ./build
+
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=4173
 
 # Expose port
-EXPOSE 80
+EXPOSE 4173
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:4173/ || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+# Run the application
+CMD ["node", "build"]
