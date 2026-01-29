@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { userApi, tradingApi, type User, type Strategy, type Portfolio, type Position, type NetWorthPoint } from '$lib/api';
+  import PieChart from '$lib/components/PieChart.svelte';
 
   // Props for direct navigation from leaderboard
   export let userId: string | null = null;
@@ -103,6 +104,40 @@
 
   function buildSymbolLink(symbol: string): string {
     return `/?symbol=${encodeURIComponent(symbol)}`;
+  }
+
+  function buildPieEntries(data: Record<string, number> | undefined): Array<{ label: string; value: number }> {
+    if (!data) return [];
+    return Object.entries(data)
+      .map(([label, value]) => ({ label, value: Number(value) }))
+      .filter((entry) => Number.isFinite(entry.value) && entry.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }
+
+  function getMarketBadge(state?: string | null): { label: string; className: string } | null {
+    if (!state) return null;
+    switch (state) {
+      case 'REGULAR':
+        return { label: 'Open', className: 'open' };
+      case 'CLOSED':
+        return { label: 'Closed', className: 'closed' };
+      case 'PRE':
+      case 'PREPRE':
+        return { label: 'Pre', className: 'extended' };
+      case 'POST':
+      case 'POSTPOST':
+        return { label: 'After', className: 'extended' };
+      default:
+        return { label: state.toLowerCase(), className: 'neutral' };
+    }
+  }
+
+  function getMarketBadgeClass(state?: string | null): string {
+    return getMarketBadge(state)?.className || 'neutral';
+  }
+
+  function getMarketBadgeLabel(state?: string | null): string {
+    return getMarketBadge(state)?.label || '';
   }
 
   function goBack() {
@@ -262,6 +297,11 @@
                 <tr>
                   <td class="symbol">
                     <a class="symbol-link" href={buildSymbolLink(pos.symbol)}>{pos.symbol}</a>
+                    {#if getMarketBadge(pos.marketState)}
+                      <span class="market-pill {getMarketBadgeClass(pos.marketState)}">
+                        {getMarketBadgeLabel(pos.marketState)}
+                      </span>
+                    {/if}
                   </td>
                   <td>{Number(pos.quantity).toFixed(4)}</td>
                   <td>{formatCurrency(pos.marketValue ?? 0)}</td>
@@ -273,6 +313,28 @@
             </tbody>
           </table>
         {/if}
+      </div>
+
+      <div class="section allocations">
+        <div class="allocation-card">
+          <h4>By Asset Type</h4>
+          <div class="allocation-list">
+            <PieChart entries={buildPieEntries(portfolio.allocationByType)} />
+            {#if Object.keys(portfolio.allocationByType ?? {}).length === 0}
+              <div class="empty-small">No allocations</div>
+            {/if}
+          </div>
+        </div>
+
+        <div class="allocation-card">
+          <h4>By Currency</h4>
+          <div class="allocation-list">
+            <PieChart entries={buildPieEntries(portfolio.allocationByCurrency)} />
+            {#if Object.keys(portfolio.allocationByCurrency ?? {}).length === 0}
+              <div class="empty-small">No allocations</div>
+            {/if}
+          </div>
+        </div>
       </div>
 
       <div class="section">
@@ -526,6 +588,64 @@
     color: #007bff;
   }
 
+  .market-pill {
+    margin-left: 0.4rem;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 999px;
+    border: 1px solid #ddd;
+    background: #f8f9fa;
+    color: #555;
+  }
+
+  .market-pill.open {
+    border-color: #28a745;
+    color: #1f7a33;
+    background: #e6f4ea;
+  }
+
+  .market-pill.closed {
+    border-color: #dc3545;
+    color: #a71d2a;
+    background: #fdeaea;
+  }
+
+  .market-pill.extended {
+    border-color: #ffb347;
+    color: #9b5b00;
+    background: #fff3e0;
+  }
+
+  .market-pill.neutral {
+    border-color: #bbb;
+    color: #555;
+  }
+
+  .allocations {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+
+  .allocation-card {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .allocation-card h4 {
+    font-size: 0.875rem;
+    margin: 0 0 0.75rem 0;
+    color: #666;
+  }
+
+  .allocation-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
   .symbol-link {
     color: inherit;
     text-decoration: none;
@@ -701,6 +821,10 @@
 
     .card .value {
       font-size: 0.95rem;
+    }
+
+    .allocations {
+      grid-template-columns: 1fr;
     }
 
     .chart-header {

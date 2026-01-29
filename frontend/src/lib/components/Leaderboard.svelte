@@ -64,6 +64,7 @@
           <th>Player</th>
           <th>Strategy</th>
           <th>Net Worth</th>
+          <th>Cash</th>
           <th>P&L</th>
           <th>Return</th>
         </tr>
@@ -81,6 +82,7 @@
             <td class="player">{entry.displayName}</td>
             <td class="strategy">{entry.strategyName}</td>
             <td class="net-worth">{formatCurrency(entry.netWorth)}</td>
+            <td class="cash">{formatCurrency(entry.cashBalance)}</td>
             <td class="pnl" class:positive={entry.pnl >= 0} class:negative={entry.pnl < 0}>
               {formatCurrency(entry.pnl)}
             </td>
@@ -154,6 +156,10 @@
   .net-worth {
     font-weight: 600;
     font-size: 1.1rem;
+  }
+
+  .cash {
+    color: #666;
   }
 
   .positive {

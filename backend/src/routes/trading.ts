@@ -20,6 +20,8 @@ interface Position {
   currency: string;
   quantity: number;
   average_cost: number;
+  marketState?: string | null;
+  regularMarketTime?: string | null;
 }
 
 interface TradeRequest {
@@ -297,6 +299,8 @@ export async function tradingRoutes(fastify: FastifyInstance): Promise<void> {
             costBasis,
             unrealizedPnl,
             unrealizedPnlPercent,
+            marketState: quote?.marketState ?? null,
+            regularMarketTime: quote?.regularMarketTime ?? null,
           };
         })
       );

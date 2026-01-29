@@ -60,6 +60,26 @@
 
   $: priceClass = quote?.change >= 0 ? 'positive' : 'negative';
 
+  function getMarketStatus(state?: string | null): { label: string; className: string } | null {
+    if (!state) return null;
+    switch (state) {
+      case 'REGULAR':
+        return { label: 'Market Open', className: 'open' };
+      case 'CLOSED':
+        return { label: 'Market Closed', className: 'closed' };
+      case 'PRE':
+      case 'PREPRE':
+        return { label: 'Pre-market', className: 'extended' };
+      case 'POST':
+      case 'POSTPOST':
+        return { label: 'After-hours', className: 'extended' };
+      default:
+        return { label: `Market ${state.toLowerCase()}`, className: 'neutral' };
+    }
+  }
+
+  $: marketStatus = getMarketStatus(quote?.marketState);
+
   // Chart helper functions
   $: chartBars = chartData
     .map((p) => ({
@@ -158,6 +178,9 @@
         >
           Yahoo Finance ↗
         </a>
+        {#if marketStatus}
+          <span class="market-pill {marketStatus.className}">{marketStatus.label}</span>
+        {/if}
       </div>
       {#if profile?.description}
         <p class="description">{profile.description}</p>
@@ -271,6 +294,18 @@
           </a>
         </div>
       {/if}
+      {#if marketStatus}
+        <div class="detail">
+          <span class="label">Market Status</span>
+          <span class="value">{marketStatus.label}</span>
+        </div>
+      {/if}
+      {#if quote?.regularMarketTime}
+        <div class="detail">
+          <span class="label">Market Time</span>
+          <span class="value">{new Date(quote.regularMarketTime).toLocaleString()}</span>
+        </div>
+      {/if}
       <div class="detail">
         <span class="label">Last Updated</span>
         <span class="value">{quote.timestamp}</span>
@@ -329,6 +364,38 @@
   .yahoo-link:hover {
     border-color: #007bff;
     background: #eef5ff;
+  }
+
+  .market-pill {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid #ddd;
+    background: #f8f9fa;
+    color: #555;
+  }
+
+  .market-pill.open {
+    border-color: #28a745;
+    color: #1f7a33;
+    background: #e6f4ea;
+  }
+
+  .market-pill.closed {
+    border-color: #dc3545;
+    color: #a71d2a;
+    background: #fdeaea;
+  }
+
+  .market-pill.extended {
+    border-color: #ffb347;
+    color: #9b5b00;
+    background: #fff3e0;
+  }
+
+  .market-pill.neutral {
+    border-color: #bbb;
+    color: #555;
   }
 
   .price-container {

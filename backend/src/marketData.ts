@@ -9,6 +9,8 @@ interface Quote {
   changePercent: number;
   volume: number;
   timestamp: string;
+  marketState: string | null;
+  regularMarketTime: string | null;
 }
 
 interface ChartData {
@@ -30,6 +32,20 @@ interface ProfileSummary {
   shortName: string | null;
 }
 
+interface MostActiveQuote {
+  symbol: string;
+  shortName: string | null;
+  longName: string | null;
+  price: number | null;
+  change: number | null;
+  changePercent: number | null;
+  volume: number | null;
+  marketCap: number | null;
+  exchange: string | null;
+  currency: string | null;
+  quoteType: string | null;
+}
+
 // Cache for quotes (expires after 15 seconds)
 const quoteCache = new Map<string, { quote: Quote; timestamp: number }>();
 const CACHE_TTL = 15000;
@@ -41,6 +57,10 @@ const SEARCH_CACHE_TTL = 300000;
 // Cache for profile summaries (expires after 30 minutes)
 const profileCache = new Map<string, { profile: ProfileSummary; timestamp: number }>();
 const PROFILE_CACHE_TTL = 30 * 60 * 1000;
+
+// Cache for most active stocks (expires after 60 seconds)
+const mostActiveCache = new Map<number, { quotes: MostActiveQuote[]; timestamp: number }>();
+const MOST_ACTIVE_CACHE_TTL = 60 * 1000;
 
 export async function getQuote(symbol: string): Promise<Quote | null> {
   const cached = quoteCache.get(symbol);
@@ -68,6 +88,10 @@ export async function getQuote(symbol: string): Promise<Quote | null> {
       changePercent: result.regularMarketChangePercent || 0,
       volume: result.regularMarketVolume || 0,
       timestamp: new Date().toISOString(),
+      marketState: result.marketState || null,
+      regularMarketTime: result.regularMarketTime
+        ? new Date(result.regularMarketTime).toISOString()
+        : null,
     };
 
     quoteCache.set(symbol, { quote, timestamp: Date.now() });
@@ -178,6 +202,43 @@ export async function getProfileSummary(symbol: string): Promise<ProfileSummary 
   } catch (error) {
     console.error(`Error fetching profile for ${symbol}:`, error);
     return null;
+  }
+}
+
+export async function getMostActiveStocks(count = 20): Promise<MostActiveQuote[]> {
+  const safeCount = Math.min(Math.max(Math.floor(count), 1), 50);
+  const cached = mostActiveCache.get(safeCount);
+  if (cached && Date.now() - cached.timestamp < MOST_ACTIVE_CACHE_TTL) {
+    return cached.quotes;
+  }
+
+  try {
+    const result = await yahooFinance.screener({
+      scrIds: 'most_actives',
+      count: safeCount,
+      region: 'US',
+      lang: 'en-US',
+    }) as any;
+
+    const quotes = (result?.quotes || []).map((quote: any) => ({
+      symbol: quote.symbol,
+      shortName: quote.shortName || null,
+      longName: quote.longName || null,
+      price: quote.regularMarketPrice ?? null,
+      change: quote.regularMarketChange ?? null,
+      changePercent: quote.regularMarketChangePercent ?? null,
+      volume: quote.regularMarketVolume ?? null,
+      marketCap: quote.marketCap ?? null,
+      exchange: quote.fullExchangeName || quote.exchange || null,
+      currency: quote.currency || null,
+      quoteType: quote.quoteType || null,
+    })) as MostActiveQuote[];
+
+    mostActiveCache.set(safeCount, { quotes, timestamp: Date.now() });
+    return quotes;
+  } catch (error) {
+    console.error('Error fetching most active stocks:', error);
+    return [];
   }
 }
 

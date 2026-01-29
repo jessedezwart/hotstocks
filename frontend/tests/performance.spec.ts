@@ -46,7 +46,7 @@ test.describe('Performance', () => {
     expect(failedRequests).toHaveLength(0);
   });
 
-  test('static assets are cached', async ({ page, context }) => {
+  test('static assets are cached', async ({ page }) => {
     // First load
     await page.goto('/');
     await page.waitForLoadState('networkidle');

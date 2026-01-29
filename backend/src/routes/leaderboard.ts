@@ -23,6 +23,7 @@ interface LeaderboardEntry {
   strategyId: number;
   strategyName: string;
   netWorth: number;
+  cashBalance: number;
   pnl: number;
   pnlPercent: number;
 }
@@ -75,6 +76,7 @@ export async function leaderboardRoutes(fastify: FastifyInstance): Promise<void>
         strategyId: strategy.id,
         strategyName: strategy.name,
         netWorth,
+        cashBalance,
         pnl,
         pnlPercent,
       });

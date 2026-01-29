@@ -32,6 +32,8 @@ export interface Position {
   marketValue?: number;
   unrealizedPnl?: number;
   unrealizedPnlPercent?: number;
+  marketState?: string | null;
+  regularMarketTime?: string | null;
 }
 
 export interface Portfolio {
@@ -74,6 +76,8 @@ export interface Quote {
   change: number;
   changePercent: number;
   volume?: number;
+  marketState?: string | null;
+  regularMarketTime?: string | null;
 }
 
 export interface ChartDataPoint {
@@ -93,6 +97,20 @@ export interface ProfileSummary {
   fullTimeEmployees: number | null;
   longName: string | null;
   shortName: string | null;
+}
+
+export interface MostActiveQuote {
+  symbol: string;
+  shortName: string | null;
+  longName: string | null;
+  price: number | null;
+  change: number | null;
+  changePercent: number | null;
+  volume: number | null;
+  marketCap: number | null;
+  exchange: string | null;
+  currency: string | null;
+  quoteType: string | null;
 }
 
 export interface LedgerEntry {
@@ -123,6 +141,7 @@ export interface LeaderboardEntry {
   strategyId: number;
   strategyName: string;
   netWorth: number;
+  cashBalance: number;
   pnl: number;
   pnlPercent: number;
 }
@@ -215,6 +234,7 @@ export const marketApi = {
   getChart: (symbol: string, interval = 'daily') => 
     apiRequest<ChartDataPoint[]>(`/api/market/chart/${symbol}?interval=${interval}`),
   getProfile: (symbol: string) => apiRequest<ProfileSummary>(`/api/market/profile/${symbol}`),
+  getMostActives: (count = 20) => apiRequest<MostActiveQuote[]>(`/api/market/most-actives?count=${count}`),
 };
 
 // Ledger API

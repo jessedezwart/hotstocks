@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import MarketOverview from '$lib/components/MarketOverview.svelte';
   import SymbolSearch from '$lib/components/SymbolSearch.svelte';
   import QuoteView from '$lib/components/QuoteView.svelte';
   import TradeTicket from '$lib/components/TradeTicket.svelte';
@@ -25,6 +26,8 @@
 
 <div class="trade-page">
   <h2>Search & Trade</h2>
+
+  <MarketOverview />
   
   <div class="search-section">
     <SymbolSearch

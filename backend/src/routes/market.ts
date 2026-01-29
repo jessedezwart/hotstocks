@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { authenticate } from '../auth.js';
-import { searchSymbols, getQuote, getChartData, getProfileSummary, subscribeToPriceUpdates } from '../marketData.js';
+import { searchSymbols, getQuote, getChartData, getProfileSummary, getMostActiveStocks, subscribeToPriceUpdates } from '../marketData.js';
 
 export async function marketRoutes(fastify: FastifyInstance): Promise<void> {
   // Search symbols
@@ -61,6 +61,19 @@ export async function marketRoutes(fastify: FastifyInstance): Promise<void> {
       }
 
       return profile;
+    }
+  );
+
+  // Get most active stocks
+  fastify.get<{ Querystring: { count?: string } }>(
+    '/api/market/most-actives',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const rawCount = request.query.count;
+      const parsedCount = rawCount ? parseInt(rawCount, 10) : 20;
+      const count = Number.isFinite(parsedCount) ? parsedCount : 20;
+      const quotes = await getMostActiveStocks(count);
+      return quotes;
     }
   );
 

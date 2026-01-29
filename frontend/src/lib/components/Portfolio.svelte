@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { activeStrategy } from '$lib/stores';
   import { tradingApi, type Portfolio as PortfolioData, type Position, type NetWorthPoint } from '$lib/api';
+  import PieChart from '$lib/components/PieChart.svelte';
 
   let portfolio: PortfolioData | null = null;
   let positions: Position[] = [];
@@ -56,6 +57,40 @@
 
   function buildSymbolLink(symbol: string): string {
     return `/?symbol=${encodeURIComponent(symbol)}`;
+  }
+
+  function buildPieEntries(data: Record<string, number> | undefined): Array<{ label: string; value: number }> {
+    if (!data) return [];
+    return Object.entries(data)
+      .map(([label, value]) => ({ label, value: Number(value) }))
+      .filter((entry) => Number.isFinite(entry.value) && entry.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }
+
+  function getMarketBadge(state?: string | null): { label: string; className: string } | null {
+    if (!state) return null;
+    switch (state) {
+      case 'REGULAR':
+        return { label: 'Open', className: 'open' };
+      case 'CLOSED':
+        return { label: 'Closed', className: 'closed' };
+      case 'PRE':
+      case 'PREPRE':
+        return { label: 'Pre', className: 'extended' };
+      case 'POST':
+      case 'POSTPOST':
+        return { label: 'After', className: 'extended' };
+      default:
+        return { label: state.toLowerCase(), className: 'neutral' };
+    }
+  }
+
+  function getMarketBadgeClass(state?: string | null): string {
+    return getMarketBadge(state)?.className || 'neutral';
+  }
+
+  function getMarketBadgeLabel(state?: string | null): string {
+    return getMarketBadge(state)?.label || '';
   }
 
   // Chart helper functions
@@ -243,6 +278,11 @@
               <tr>
                 <td class="symbol">
                   <a class="symbol-link" href={buildSymbolLink(pos.symbol)}>{pos.symbol}</a>
+                  {#if getMarketBadge(pos.marketState)}
+                    <span class="market-pill {getMarketBadgeClass(pos.marketState)}">
+                      {getMarketBadgeLabel(pos.marketState)}
+                    </span>
+                  {/if}
                 </td>
                 <td>{pos.asset_type}</td>
                 <td>{Number(pos.quantity).toFixed(4)}</td>
@@ -263,12 +303,7 @@
       <div class="allocation-card">
         <h4>By Asset Type</h4>
         <div class="allocation-list">
-          {#each Object.entries(portfolio.allocationByType ?? {}) as [type, value]}
-            <div class="allocation-item">
-              <span class="type">{type}</span>
-              <span class="amount">{formatCurrency(value as number)}</span>
-            </div>
-          {/each}
+          <PieChart entries={buildPieEntries(portfolio.allocationByType)} />
           {#if Object.keys(portfolio.allocationByType ?? {}).length === 0}
             <div class="empty-small">No allocations</div>
           {/if}
@@ -278,12 +313,7 @@
       <div class="allocation-card">
         <h4>By Currency</h4>
         <div class="allocation-list">
-          {#each Object.entries(portfolio.allocationByCurrency ?? {}) as [currency, value]}
-            <div class="allocation-item">
-              <span class="type">{currency}</span>
-              <span class="amount">{formatCurrency(value as number)}</span>
-            </div>
-          {/each}
+          <PieChart entries={buildPieEntries(portfolio.allocationByCurrency)} />
           {#if Object.keys(portfolio.allocationByCurrency ?? {}).length === 0}
             <div class="empty-small">No allocations</div>
           {/if}
@@ -403,6 +433,39 @@
     text-decoration: underline;
   }
 
+  .market-pill {
+    margin-left: 0.4rem;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 999px;
+    border: 1px solid #ddd;
+    background: #f8f9fa;
+    color: #555;
+  }
+
+  .market-pill.open {
+    border-color: #28a745;
+    color: #1f7a33;
+    background: #e6f4ea;
+  }
+
+  .market-pill.closed {
+    border-color: #dc3545;
+    color: #a71d2a;
+    background: #fdeaea;
+  }
+
+  .market-pill.extended {
+    border-color: #ffb347;
+    color: #9b5b00;
+    background: #fff3e0;
+  }
+
+  .market-pill.neutral {
+    border-color: #bbb;
+    color: #555;
+  }
+
   .allocations {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -437,14 +500,6 @@
 
   .allocation-item:last-child {
     border-bottom: none;
-  }
-
-  .allocation-item .type {
-    text-transform: capitalize;
-  }
-
-  .allocation-item .amount {
-    font-weight: 500;
   }
 
   /* Chart styles */

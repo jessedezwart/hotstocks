@@ -448,11 +448,11 @@
       padding: 1rem;
     }
 
-    .mode-toggle {
+    .input-mode-toggle {
       flex-direction: column;
     }
 
-    .mode-toggle button {
+    .input-mode-toggle button {
       width: 100%;
     }
 

@@ -284,11 +284,6 @@
       padding: 0.5rem;
     }
 
-    h2 {
-      font-size: 1.25rem;
-      margin-bottom: 1rem;
-    }
-
     .ledger-table {
       display: block;
       overflow-x: auto;
