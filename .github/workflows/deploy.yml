@@ -63,9 +63,17 @@ jobs:
         run: |
           rsync -avz ./docker-compose.yml root@${{ vars.VPS_HOST }}:/root/
 
+      - name: Deploy Caddyfile
+        run: |
+          rsync -avz ./Caddyfile root@${{ vars.VPS_HOST }}:/etc/caddy/Caddyfile
+
       - name: Rebuild and restart services
         run: |
           ssh root@${{ vars.VPS_HOST }} "cd /root && docker compose up -d --build"
+
+      - name: Reload Caddy
+        run: |
+          ssh root@${{ vars.VPS_HOST }} "caddy reload --config /etc/caddy/Caddyfile"
 
       - name: Run database migrations
         run: |
