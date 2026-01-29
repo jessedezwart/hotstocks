@@ -14,6 +14,9 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -81,10 +84,7 @@ jobs:
           ssh root@${{ vars.VPS_HOST }} "touch /root/.env && (grep -v '^IMAGE_TAG=' /root/.env > /root/.env.tmp || true) && printf '%s\\n' 'IMAGE_TAG=${{ github.sha }}' >> /root/.env.tmp && mv /root/.env.tmp /root/.env"
 
       - name: Log in to GHCR on VPS
-        if: ${{ secrets.GHCR_TOKEN != '' }}
-        env:
-          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        if: ${{ env.GHCR_TOKEN != '' }}
         run: |
           ssh root@${{ vars.VPS_HOST }} "echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USERNAME}' --password-stdin"
 
