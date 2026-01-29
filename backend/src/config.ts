@@ -5,6 +5,7 @@ export const config = {
   port: parseInt(process.env.PORT || '3000'),
   host: process.env.HOST || '0.0.0.0',
   databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/hotstocks',
+  redisUrl: process.env.REDIS_URL || '',
   auth0: {
     domain: process.env.AUTH0_DOMAIN || '',
     audience: process.env.AUTH0_AUDIENCE || '',

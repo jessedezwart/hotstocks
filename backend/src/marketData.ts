@@ -1,4 +1,5 @@
 import YahooFinance from 'yahoo-finance2';
+import { cacheGetJson, cacheSetJson } from './cache.js';
 
 const yahooFinance = new YahooFinance();
 
@@ -46,26 +47,52 @@ interface MostActiveQuote {
   quoteType: string | null;
 }
 
-// Cache for quotes (expires after 15 seconds)
-const quoteCache = new Map<string, { quote: Quote; timestamp: number }>();
-const CACHE_TTL = 15000;
+const QUOTE_CACHE_TTL_MS = 5000;
+const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
+const PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
+const MOST_ACTIVE_CACHE_TTL_MS = 60 * 1000;
+const CHART_CACHE_TTL_MS = 10 * 60 * 1000;
 
-// Cache for search results (expires after 5 minutes)
-const searchCache = new Map<string, { results: any[]; timestamp: number }>();
-const SEARCH_CACHE_TTL = 300000;
+function quoteCacheKey(symbol: string): string {
+  return `quote:${symbol.toUpperCase()}`;
+}
 
-// Cache for profile summaries (expires after 30 minutes)
-const profileCache = new Map<string, { profile: ProfileSummary; timestamp: number }>();
-const PROFILE_CACHE_TTL = 30 * 60 * 1000;
+function searchCacheKey(query: string): string {
+  return `search:${query.trim().toLowerCase()}`;
+}
 
-// Cache for most active stocks (expires after 60 seconds)
-const mostActiveCache = new Map<number, { quotes: MostActiveQuote[]; timestamp: number }>();
-const MOST_ACTIVE_CACHE_TTL = 60 * 1000;
+function profileCacheKey(symbol: string): string {
+  return `profile:${symbol.toUpperCase()}`;
+}
 
-export async function getQuote(symbol: string): Promise<Quote | null> {
-  const cached = quoteCache.get(symbol);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return cached.quote;
+function chartCacheKey(symbol: string, interval: string): string {
+  return `chart:${symbol.toUpperCase()}:${interval}`;
+}
+
+function mostActiveCacheKey(count: number): string {
+  return `most-active:${count}`;
+}
+
+export async function getQuote(
+  symbol: string,
+  options: { maxAgeMs?: number } = {}
+): Promise<Quote | null> {
+  const maxAgeMs = options.maxAgeMs ?? QUOTE_CACHE_TTL_MS;
+  const initialCacheKey = quoteCacheKey(symbol);
+
+  if (maxAgeMs > 0) {
+    const cached = await cacheGetJson<Quote>(initialCacheKey);
+    if (cached) {
+      const cachedAt = Date.parse(cached.timestamp);
+      if (!Number.isNaN(cachedAt)) {
+        const ageMs = Date.now() - cachedAt;
+        if (ageMs <= maxAgeMs) {
+          return cached;
+        }
+      } else {
+        return cached;
+      }
+    }
   }
 
   try {
@@ -94,7 +121,10 @@ export async function getQuote(symbol: string): Promise<Quote | null> {
         : null,
     };
 
-    quoteCache.set(symbol, { quote, timestamp: Date.now() });
+    const cacheKeys = new Set([initialCacheKey, quoteCacheKey(yahooSymbol)]);
+    await Promise.all(
+      Array.from(cacheKeys).map((key) => cacheSetJson(key, quote, QUOTE_CACHE_TTL_MS))
+    );
     return quote;
   } catch (error) {
     console.error(`Error fetching quote for ${symbol}:`, error);
@@ -109,10 +139,10 @@ export async function searchSymbols(query: string): Promise<Array<{
   exchange: string;
   currency: string;
 }>> {
-  const cacheKey = query.toLowerCase();
-  const cached = searchCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < SEARCH_CACHE_TTL) {
-    return cached.results;
+  const cacheKey = searchCacheKey(query);
+  const cached = await cacheGetJson<any[]>(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   try {
@@ -128,7 +158,7 @@ export async function searchSymbols(query: string): Promise<Array<{
         currency: q.currency || 'USD',
       }));
 
-    searchCache.set(cacheKey, { results, timestamp: Date.now() });
+    await cacheSetJson(cacheKey, results, SEARCH_CACHE_TTL_MS);
     return results;
   } catch (error) {
     console.error(`Error searching symbols for ${query}:`, error);
@@ -141,6 +171,12 @@ export async function getChartData(
   interval: 'daily' | 'weekly' | 'monthly' = 'daily'
 ): Promise<ChartData[]> {
   try {
+    const cacheKey = chartCacheKey(symbol, interval);
+    const cached = await cacheGetJson<ChartData[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const intervalMap: Record<string, '1d' | '1wk' | '1mo'> = {
       daily: '1d',
       weekly: '1wk',
@@ -157,7 +193,7 @@ export async function getChartData(
       return [];
     }
 
-    return result.quotes.map((q: any) => ({
+    const chart = result.quotes.map((q: any) => ({
       timestamp: new Date(q.date).toISOString().split('T')[0],
       open: q.open || 0,
       high: q.high || 0,
@@ -165,6 +201,8 @@ export async function getChartData(
       close: q.close || 0,
       volume: q.volume || 0,
     }));
+    await cacheSetJson(cacheKey, chart, CHART_CACHE_TTL_MS);
+    return chart;
   } catch (error) {
     console.error(`Error fetching chart data for ${symbol}:`, error);
     return [];
@@ -172,10 +210,10 @@ export async function getChartData(
 }
 
 export async function getProfileSummary(symbol: string): Promise<ProfileSummary | null> {
-  const cacheKey = symbol.toUpperCase();
-  const cached = profileCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < PROFILE_CACHE_TTL) {
-    return cached.profile;
+  const cacheKey = profileCacheKey(symbol);
+  const cached = await cacheGetJson<ProfileSummary>(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   try {
@@ -197,7 +235,7 @@ export async function getProfileSummary(symbol: string): Promise<ProfileSummary 
       shortName: price.shortName || null,
     };
 
-    profileCache.set(cacheKey, { profile, timestamp: Date.now() });
+    await cacheSetJson(cacheKey, profile, PROFILE_CACHE_TTL_MS);
     return profile;
   } catch (error) {
     console.error(`Error fetching profile for ${symbol}:`, error);
@@ -207,9 +245,10 @@ export async function getProfileSummary(symbol: string): Promise<ProfileSummary 
 
 export async function getMostActiveStocks(count = 20): Promise<MostActiveQuote[]> {
   const safeCount = Math.min(Math.max(Math.floor(count), 1), 50);
-  const cached = mostActiveCache.get(safeCount);
-  if (cached && Date.now() - cached.timestamp < MOST_ACTIVE_CACHE_TTL) {
-    return cached.quotes;
+  const cacheKey = mostActiveCacheKey(safeCount);
+  const cached = await cacheGetJson<MostActiveQuote[]>(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   try {
@@ -234,7 +273,7 @@ export async function getMostActiveStocks(count = 20): Promise<MostActiveQuote[]
       quoteType: quote.quoteType || null,
     })) as MostActiveQuote[];
 
-    mostActiveCache.set(safeCount, { quotes, timestamp: Date.now() });
+    await cacheSetJson(cacheKey, quotes, MOST_ACTIVE_CACHE_TTL_MS);
     return quotes;
   } catch (error) {
     console.error('Error fetching most active stocks:', error);
@@ -274,7 +313,7 @@ async function startPricePolling(symbol: string): Promise<void> {
       return;
     }
 
-    const quote = await getQuote(symbol);
+    const quote = await getQuote(symbol, { maxAgeMs: 0 });
     if (quote) {
       subscribers.forEach((callback) => callback(quote));
     }

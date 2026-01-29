@@ -66,6 +66,8 @@ CREATE INDEX idx_ledger_created_at ON ledger(created_at);
 CREATE INDEX idx_positions_strategy ON positions(strategy_id);
 CREATE INDEX idx_net_worth_strategy ON net_worth_history(strategy_id);
 CREATE INDEX idx_net_worth_recorded_at ON net_worth_history(recorded_at);
+CREATE INDEX idx_ledger_strategy_created_at ON ledger(strategy_id, created_at DESC);
+CREATE INDEX idx_net_worth_strategy_recorded_at ON net_worth_history(strategy_id, recorded_at DESC);
 
 -- Function to initialize strategies for a new user
 CREATE OR REPLACE FUNCTION create_user_strategies()

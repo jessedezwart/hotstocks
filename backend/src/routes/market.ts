@@ -98,7 +98,7 @@ export async function marketRoutes(fastify: FastifyInstance): Promise<void> {
             subscribedSymbols.set(symbol, unsubscribe);
             
             // Send initial quote
-            const quote = await getQuote(symbol);
+            const quote = await getQuote(symbol, { maxAgeMs: 0 });
             if (quote) {
               connection.send(JSON.stringify({
                 type: 'quote',

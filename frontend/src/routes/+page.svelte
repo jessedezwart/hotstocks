@@ -1,26 +1,18 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import MarketOverview from '$lib/components/MarketOverview.svelte';
   import SymbolSearch from '$lib/components/SymbolSearch.svelte';
-  import QuoteView from '$lib/components/QuoteView.svelte';
-  import TradeTicket from '$lib/components/TradeTicket.svelte';
-
-  let selectedSymbol: any = null;
-  let lastSymbolParam = '';
 
   $: symbolParam = $page.url.searchParams.get('symbol') ?? '';
-  $: if (symbolParam && symbolParam !== lastSymbolParam) {
-    lastSymbolParam = symbolParam;
-    selectedSymbol = null;
+  $: if (browser && symbolParam) {
+    goto(`/stock/${encodeURIComponent(symbolParam)}`, { replaceState: true });
   }
 
   function handleSymbolSelect(event: CustomEvent) {
-    selectedSymbol = event.detail;
-  }
-
-  function handleTrade(event: CustomEvent) {
-    // Optionally refresh data after trade
-    console.log('Trade executed:', event.detail);
+    if (!event.detail?.symbol) return;
+    goto(`/stock/${encodeURIComponent(event.detail.symbol)}`);
   }
 </script>
 
@@ -36,30 +28,6 @@
   </div>
 
   <MarketOverview />
-
-  {#if selectedSymbol}
-    <div class="trade-layout">
-      <div class="quote-section">
-        <QuoteView 
-          symbol={selectedSymbol.symbol} 
-          showChart={true} 
-        />
-      </div>
-      <div class="ticket-section">
-        <TradeTicket 
-          symbol={selectedSymbol.symbol}
-          assetType={selectedSymbol.type === 'ETF' ? 'etf' : selectedSymbol.type === 'Crypto' ? 'crypto' : 'stock'}
-          exchange={selectedSymbol.exchange}
-          currency={selectedSymbol.currency}
-          on:trade={handleTrade}
-        />
-      </div>
-    </div>
-  {:else}
-    <div class="placeholder">
-      <p>Search for a stock, ETF, or crypto to start trading</p>
-    </div>
-  {/if}
 </div>
 
 <style>
@@ -77,30 +45,4 @@
     margin-bottom: 2rem;
   }
 
-  .trade-layout {
-    display: grid;
-    grid-template-columns: 1fr 380px;
-    gap: 2rem;
-    align-items: start;
-  }
-
-  @media (max-width: 900px) {
-    .trade-layout {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  .placeholder {
-    text-align: center;
-    padding: 4rem 2rem;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    color: #666;
-  }
-
-  .placeholder p {
-    margin: 0;
-    font-size: 1.1rem;
-  }
 </style>

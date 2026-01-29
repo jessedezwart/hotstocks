@@ -26,7 +26,7 @@
   }
 
   function viewSymbol(symbol: string) {
-    goto(`/?symbol=${encodeURIComponent(symbol)}`);
+    goto(`/stock/${encodeURIComponent(symbol)}`);
   }
 
   function formatCurrency(value: number | null): string {

@@ -95,20 +95,8 @@ export async function tradingRoutes(fastify: FastifyInstance): Promise<void> {
     const auth0Id = request.user!.sub;
     const trade = request.body as TradeRequest;
 
-    // Verify strategy belongs to user
-    const strategy = await queryOne<Strategy>(
-      `SELECT s.* FROM strategies s
-       JOIN users u ON s.user_id = u.id
-       WHERE s.id = $1 AND u.auth0_id = $2`,
-      [trade.strategyId, auth0Id]
-    );
-
-    if (!strategy) {
-      return reply.code(403).send({ error: 'Strategy not found or access denied' });
-    }
-
     // Get current quote
-    const quote = await getQuote(trade.symbol);
+    const quote = await getQuote(trade.symbol, { maxAgeMs: 0 });
     if (!quote) {
       return reply.code(400).send({ error: 'Unable to get quote for symbol' });
     }
@@ -127,24 +115,6 @@ export async function tradingRoutes(fastify: FastifyInstance): Promise<void> {
     }
 
     const tradeAmount = quantity * price;
-    const totalCost = trade.side === 'buy' ? tradeAmount + commission : -tradeAmount + commission;
-
-    // Check if user has enough cash for buy
-    if (trade.side === 'buy' && strategy.cash_balance < tradeAmount + commission) {
-      return reply.code(400).send({ error: 'Insufficient funds' });
-    }
-
-    // For sells, check if user has enough shares
-    if (trade.side === 'sell') {
-      const position = await queryOne<Position>(
-        'SELECT * FROM positions WHERE strategy_id = $1 AND symbol = $2',
-        [trade.strategyId, trade.symbol]
-      );
-      
-      if (!position || position.quantity < quantity) {
-        return reply.code(400).send({ error: 'Insufficient shares' });
-      }
-    }
 
     // Execute trade in transaction
     const client = await (await import('../db.js')).pool.connect();
@@ -152,10 +122,47 @@ export async function tradingRoutes(fastify: FastifyInstance): Promise<void> {
     try {
       await client.query('BEGIN');
 
+      // Lock strategy row to prevent concurrent cash updates
+      const strategyResult = await client.query(
+        `SELECT s.* FROM strategies s
+         JOIN users u ON s.user_id = u.id
+         WHERE s.id = $1 AND u.auth0_id = $2
+         FOR UPDATE`,
+        [trade.strategyId, auth0Id]
+      );
+
+      const strategy = strategyResult.rows[0] as Strategy | undefined;
+      if (!strategy) {
+        await client.query('ROLLBACK');
+        return reply.code(403).send({ error: 'Strategy not found or access denied' });
+      }
+
+      const currentCashBalance = Number(strategy.cash_balance);
+
+      // Check if user has enough cash for buy
+      if (trade.side === 'buy' && currentCashBalance < tradeAmount + commission) {
+        await client.query('ROLLBACK');
+        return reply.code(400).send({ error: 'Insufficient funds' });
+      }
+
+      // For sells, check if user has enough shares
+      if (trade.side === 'sell') {
+        const positionResult = await client.query(
+          'SELECT * FROM positions WHERE strategy_id = $1 AND symbol = $2',
+          [trade.strategyId, trade.symbol]
+        );
+
+        const position = positionResult.rows[0] as Position | undefined;
+        if (!position || position.quantity < quantity) {
+          await client.query('ROLLBACK');
+          return reply.code(400).send({ error: 'Insufficient shares' });
+        }
+      }
+
       // Update cash balance
       const newCashBalance = trade.side === 'buy'
-        ? strategy.cash_balance - tradeAmount - commission
-        : strategy.cash_balance + tradeAmount - commission;
+        ? currentCashBalance - tradeAmount - commission
+        : currentCashBalance + tradeAmount - commission;
 
       await client.query(
         'UPDATE strategies SET cash_balance = $1, updated_at = NOW() WHERE id = $2',

@@ -68,6 +68,7 @@ export interface SearchResult {
   type: string;
   region: string;
   currency: string;
+  exchange?: string;
 }
 
 export interface Quote {
