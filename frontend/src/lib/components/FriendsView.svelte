@@ -154,6 +154,18 @@
     }
   }
 
+  function getFirstName(name?: string | null): string {
+    if (!name) return '';
+    const trimmed = name.trim();
+    if (!trimmed) return '';
+    return trimmed.split(/\s+/)[0];
+  }
+
+  function getFirstInitial(name?: string | null): string {
+    const firstName = getFirstName(name);
+    return firstName ? firstName.charAt(0).toUpperCase() : '';
+  }
+
   // Chart helper functions
   $: chartData = netWorthHistory.map(p => ({
     date: new Date(p.recorded_at),
@@ -224,9 +236,9 @@
     {/if}
     <h2>
       {#if selectedStrategy}
-        {selectedUser?.display_name || 'User'}'s Strategy {selectedStrategy.name}
+        {getFirstName(selectedUser?.display_name) || 'User'}'s Strategy {selectedStrategy.name}
       {:else if selectedUser}
-        {selectedUser?.display_name || 'User'}'s Strategies
+        {getFirstName(selectedUser?.display_name) || 'User'}'s Strategies
       {:else}
         Friends
       {/if}
@@ -242,9 +254,9 @@
     <div class="user-list">
       {#each users as user}
         <button class="user-card" onclick={() => selectUser(user)}>
-          <div class="avatar">{user.display_name ? user.display_name.charAt(0).toUpperCase() : '?'}</div>
+          <div class="avatar">{getFirstInitial(user.display_name) || '?'}</div>
           <div class="info">
-            <span class="name">{user.display_name || 'Unknown'}</span>
+            <span class="name">{getFirstName(user.display_name) || 'Unknown'}</span>
           </div>
         </button>
       {/each}

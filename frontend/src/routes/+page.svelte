@@ -27,8 +27,6 @@
 <div class="trade-page">
   <h2>Search & Trade</h2>
 
-  <MarketOverview />
-  
   <div class="search-section">
     <SymbolSearch
       initialQuery={symbolParam}
@@ -36,6 +34,8 @@
       on:select={handleSymbolSelect}
     />
   </div>
+
+  <MarketOverview />
 
   {#if selectedSymbol}
     <div class="trade-layout">
