@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onDestroy, onMount } from 'svelte';
   import { activeStrategy } from '$lib/stores';
-  import { tradingApi, marketApi } from '$lib/api';
+  import { tradingApi, marketApi, createQuoteStream } from '$lib/api';
 
   const dispatch = createEventDispatcher();
 
@@ -21,9 +21,49 @@
   let submitting = false;
   let error = '';
   let success = '';
+  let quoteStream: ReturnType<typeof createQuoteStream> | null = null;
+  let subscribedSymbol = '';
+  let pricePulse = false;
+  let pulseTimer: ReturnType<typeof setTimeout> | null = null;
 
   $: if (symbol) {
     loadQuote();
+  }
+
+  onMount(() => {
+    quoteStream = createQuoteStream((newQuote) => {
+      if (!newQuote?.symbol || newQuote.symbol.toUpperCase() !== symbol.toUpperCase()) {
+        return;
+      }
+      const prevPrice = quote?.price;
+      quote = newQuote;
+      if (prevPrice != null && newQuote.price !== prevPrice) {
+        triggerPulse();
+      }
+    });
+  });
+
+  onDestroy(() => {
+    if (quoteStream) {
+      if (subscribedSymbol) {
+        quoteStream.unsubscribe(subscribedSymbol);
+      }
+      quoteStream.close();
+    }
+    if (pulseTimer) {
+      clearTimeout(pulseTimer);
+    }
+  });
+
+  $: if (quoteStream && symbol) {
+    const nextSymbol = symbol.toUpperCase();
+    if (subscribedSymbol !== nextSymbol) {
+      if (subscribedSymbol) {
+        quoteStream.unsubscribe(subscribedSymbol);
+      }
+      subscribedSymbol = nextSymbol;
+      quoteStream.subscribe(subscribedSymbol);
+    }
   }
 
   async function loadQuote() {
@@ -35,6 +75,16 @@
     } finally {
       loading = false;
     }
+  }
+
+  function triggerPulse() {
+    pricePulse = true;
+    if (pulseTimer) {
+      clearTimeout(pulseTimer);
+    }
+    pulseTimer = setTimeout(() => {
+      pricePulse = false;
+    }, 450);
   }
 
   $: estimatedTotal = (() => {
@@ -130,7 +180,7 @@
   {#if loading}
     <div class="loading">Loading quote...</div>
   {:else if quote}
-    <div class="current-price">
+    <div class="current-price" class:pulse={pricePulse}>
       <span class="label">Current Price</span>
       <span class="price">${Number(quote.price).toFixed(2)}</span>
     </div>
@@ -273,6 +323,10 @@
     background: #f8f9fa;
     border-radius: 4px;
     margin-bottom: 1rem;
+  }
+
+  .current-price.pulse {
+    animation: price-pulse 0.45s ease;
   }
 
   .current-price .label {
@@ -440,6 +494,18 @@
   .submit-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  @keyframes price-pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.35);
+    }
+    60% {
+      box-shadow: 0 0 0 6px rgba(0, 123, 255, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(0, 123, 255, 0);
+    }
   }
 
   /* Mobile Responsive */

@@ -11,6 +11,8 @@
   let loading = true;
   let error = '';
   let quoteStream: ReturnType<typeof createQuoteStream> | null = null;
+  let pricePulse = false;
+  let pulseTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Chart dimensions
   const chartWidth = 600;
@@ -26,6 +28,9 @@
     if (quoteStream) {
       quoteStream.unsubscribe(symbol);
       quoteStream.close();
+    }
+    if (pulseTimer) {
+      clearTimeout(pulseTimer);
     }
   });
 
@@ -52,10 +57,24 @@
   function setupStream() {
     quoteStream = createQuoteStream((newQuote) => {
       if (newQuote.symbol === symbol) {
+        const prevPrice = quote?.price;
         quote = newQuote;
+        if (prevPrice != null && newQuote.price !== prevPrice) {
+          triggerPulse();
+        }
       }
     });
     quoteStream.subscribe(symbol);
+  }
+
+  function triggerPulse() {
+    pricePulse = true;
+    if (pulseTimer) {
+      clearTimeout(pulseTimer);
+    }
+    pulseTimer = setTimeout(() => {
+      pricePulse = false;
+    }, 450);
   }
 
   $: priceClass = quote?.change >= 0 ? 'positive' : 'negative';
@@ -185,7 +204,7 @@
       {#if profile?.description}
         <p class="description">{profile.description}</p>
       {/if}
-      <div class="price-container">
+      <div class="price-container" class:pulse={pricePulse}>
         <span class="price">${Number(quote.price).toFixed(2)}</span>
         <span class="change {priceClass}">
           {quote.change >= 0 ? '+' : ''}{Number(quote.change).toFixed(2)}
@@ -404,6 +423,10 @@
     gap: 0.75rem;
   }
 
+  .price-container.pulse {
+    animation: price-pulse 0.45s ease;
+  }
+
   .price {
     font-size: 2rem;
     font-weight: 700;
@@ -420,6 +443,18 @@
 
   .change.negative {
     color: #dc3545;
+  }
+
+  @keyframes price-pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.35);
+    }
+    60% {
+      box-shadow: 0 0 0 8px rgba(0, 123, 255, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(0, 123, 255, 0);
+    }
   }
 
   .description {
