@@ -12,6 +12,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Generate SvelteKit types/config before build
+RUN npm run prepare
+
 # Build arguments for environment variables
 ARG VITE_API_URL
 ARG VITE_AUTH0_DOMAIN
