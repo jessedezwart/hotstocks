@@ -12,7 +12,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./hotstocks-backend/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -34,9 +34,7 @@ services:
 
   # Backend API
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/jessedezwart/hotstocks-backend:${IMAGE_TAG:-latest}
     container_name: hotstocks-backend
     restart: unless-stopped
     environment:
@@ -69,14 +67,7 @@ services:
 
   # Frontend (SvelteKit SSR)
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL}
-        VITE_AUTH0_DOMAIN: ${VITE_AUTH0_DOMAIN}
-        VITE_AUTH0_CLIENT_ID: ${VITE_AUTH0_CLIENT_ID}
-        VITE_AUTH0_AUDIENCE: ${VITE_AUTH0_AUDIENCE}
+    image: ghcr.io/jessedezwart/hotstocks-frontend:${IMAGE_TAG:-latest}
     container_name: hotstocks-frontend
     restart: unless-stopped
     environment:
