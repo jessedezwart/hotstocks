@@ -82,7 +82,15 @@ jobs:
 
       - name: Rebuild and restart services
         run: |
-          ssh root@${{ vars.VPS_HOST }} "cd /root && docker compose pull && docker compose up -d"
+          ssh root@${{ vars.VPS_HOST }} "
+            set -e
+            cd /root
+            docker compose pull
+            if ! docker compose up -d --remove-orphans; then
+              docker rm -f hotstocks-frontend hotstocks-backend hotstocks-redis hotstocks-postgres || true
+              docker compose up -d --remove-orphans
+            fi
+          "
 
       - name: Reload Caddy
         run: |
