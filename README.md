@@ -1,3 +1,7 @@
+## Slop
+
+This project was made 100% with AI. I haven't done much to this code myself.
+
 # 🔥 Hot Stocks
 
 A virtual trading game for a private group of friends. Each user starts with $100,000 virtual cash and can trade stocks, ETFs, and crypto 24/7.
